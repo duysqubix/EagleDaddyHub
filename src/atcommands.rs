@@ -11,46 +11,39 @@ pub struct AtCommand<'a> {
 
 #[derive(Debug)]
 pub enum AtCommands<'a> {
-    ID(Option<&'a [u8]>),
-    AP(Option<&'a [u8]>),
-    ND(Option<&'a [u8]>),
-    NI(Option<&'a [u8]>),
-    CN,
-    CmdOn,
+    //    AC,                     // apply changes
+    //    AP(Option<&'a [u8]>),   // API
+    //    CmdOn,
+    //    CN,
+    //    ID(Option<&'a [u8]>),
+    Discover(Option<&'a [u8]>),
+    //    NI(Option<&'a [u8]>),
+    AtCmd((&'a str, Option<&'a [u8]>)),
+    CmdMode(bool),
 }
 
 impl AtCommands<'_> {
     pub fn create(&self) -> AtCommand {
         match *self {
-            AtCommands::ID(ref param) => AtCommand {
-                command: "ID",
-                parameter: param,
-                rcr_len: 1,
+            AtCommands::CmdMode(ref state) => match state {
+                true => AtCommand {
+                    command: "+++",
+                    parameter: &None,
+                    rcr_len: 1,
+                },
+                false => AtCommand {
+                    command: "CN",
+                    parameter: &None,
+                    rcr_len: 1,
+                },
             },
-            AtCommands::CN => AtCommand {
-                command: "CN",
-                parameter: &None,
-                rcr_len: 1,
-            },
-            AtCommands::CmdOn => AtCommand {
-                command: "+++",
-                parameter: &None,
-                rcr_len: 1,
-            },
-
-            AtCommands::AP(ref param) => AtCommand {
-                command: "AP",
-                parameter: param,
-                rcr_len: 1,
-            },
-            AtCommands::ND(ref param) => AtCommand {
+            AtCommands::Discover(ref param) => AtCommand {
                 command: "ND",
                 parameter: param,
                 rcr_len: 10 + 1,
             },
-
-            AtCommands::NI(ref param) => AtCommand {
-                command: "NI",
+            AtCommands::AtCmd((ref cmd, ref param)) => AtCommand {
+                command: cmd,
                 parameter: param,
                 rcr_len: 1,
             },
