@@ -10,10 +10,12 @@ use serialport::{self, prelude::*};
 use std::io::Write;
 use std::thread;
 use std::time::Duration;
+
 struct DigiMeshDevice {
     serial: Box<dyn SerialPort>,
-    api: ApiFrame,
     cmd_mode: bool,
+    rx_buf: BytesMut,
+    tx_buf: BytesMut,
     //addr_64: u64,
     //addr_16: u16,
     //node_id: u16,
@@ -33,9 +35,10 @@ impl DigiMeshDevice {
             timeout: Duration::from_millis(20000),
         };
         Ok(Self {
-            serial: serialport::open_with_settings("/dev/ttyUSB1", &settings)?,
+            serial: serialport::open_with_settings("/dev/ttyUSB0", &settings)?,
             cmd_mode: false,
-            api: ApiFrame::new(),
+            rx_buf: BytesMut::with_capacity(128),
+            tx_buf: BytesMut::with_capacity(128),
         })
     }
 
@@ -44,25 +47,27 @@ impl DigiMeshDevice {
     }
 
     /// send an AT command and returns the result
-    fn atcmd<'a>(&mut self, atcmd: &'a AtCommand) -> Result<BytesMut> {
-        let mut tx_buf = BytesMut::with_capacity(500);
-        let mut recv_buf = BytesMut::with_capacity(500);
+    fn atcmd<'a>(&mut self, atcmd: &'a AtCommand) -> Result<()> {
         let mut apply_changes = false;
+        self.tx_buf.clear();
+        self.rx_buf.clear();
+
         if atcmd.command != "+++" {
-            tx_buf.put(&b"AT"[..]);
-            tx_buf.put(atcmd.command.as_bytes());
+            self.tx_buf.put(&b"AT"[..]);
+            self.tx_buf.put(atcmd.command.as_bytes());
 
             if let Some(data) = &atcmd.parameter {
-                tx_buf.put(&data[..]);
+                self.tx_buf.put(&data[..]);
                 apply_changes = true;
             }
-            tx_buf.put_u8(0x0d);
+            self.tx_buf.put_u8(0x0d);
         } else {
-            tx_buf.put(atcmd.command.as_bytes());
+            self.tx_buf.put(atcmd.command.as_bytes());
         }
         // we have constructed the AT commands, now just send it
         //println!("Sending: {:x?}", &tx_buf[..]);
-        self.send(&tx_buf[..])?;
+
+        self.serial.write(&self.tx_buf[..])?;
 
         let mut mini_buf: [u8; 1] = [0; 1];
         let mut cr_counter = 0;
@@ -75,29 +80,29 @@ impl DigiMeshDevice {
                 }
             }
             self.serial.read_exact(&mut mini_buf)?;
-            recv_buf.put_u8(mini_buf[0]);
+            self.rx_buf.put_u8(mini_buf[0]);
         }
 
-        if recv_buf.len() < 1 {
+        if self.rx_buf.len() < 1 {
             return Err(Error::IOError(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "RX buf empty",
             )));
         }
 
-        Ok(recv_buf)
+        Ok(())
     }
 
     fn command_mode(&mut self, mode: bool) -> Result<()> {
         match mode {
             true => {
                 thread::sleep(Duration::from_millis(1000));
-                println!("{:?}", self.atcmd(&AtCommands::CmdMode(true).create())?);
+                self.atcmd(&AtCommands::CmdMode(true).create())?;
                 thread::sleep(Duration::from_millis(1000));
                 self.cmd_mode = true;
             }
             false => {
-                println!("{:?}", self.atcmd(&AtCommands::CmdMode(false).create())?);
+                self.atcmd(&AtCommands::CmdMode(false).create())?;
                 self.cmd_mode = false;
             }
         }
@@ -121,10 +126,14 @@ fn main() -> Result<()> {
     let mut device = DigiMeshDevice::new()?;
     // set api to 1
     device.atcmd(&AtCommands::CmdMode(true).create())?;
+    println!("{:x?}", device.rx_buf);
     device.atcmd(&AtCommands::AtCmd(("AP", Some(b"1"))).create())?;
+    println!("{:x?}", device.rx_buf);
     device.apply_changes();
     device.command_mode(false)?;
+    println!("{:x?}", device.rx_buf);
     println!("Attempting to send something");
+
     let packet = device
         .api
         .transmit_request(api::BROADCAST_ADDR, 0, 0, b"HELLO FROM API")?;

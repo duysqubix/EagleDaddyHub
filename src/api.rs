@@ -30,21 +30,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 //device.api.transmit_request(BROADCAST_ADDR, b"HELLO WORLD")?;
 //device.api
 
-pub struct ApiFrame {
-    delim: u8,
-    length: u16,
-    checksum: u8,
-}
+struct TransmitRequest {}
+
+pub struct ApiFrame;
 
 impl<'a> ApiFrame {
-    pub fn new() -> Self {
-        Self {
-            delim: 0x7e,
-            length: 0,
-            checksum: 0,
-        }
-    }
-
     pub fn transmit_request(
         &mut self,
         dest_addr: u64,
