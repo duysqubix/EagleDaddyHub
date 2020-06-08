@@ -134,9 +134,10 @@ fn main() -> Result<()> {
     println!("{:x?}", device.rx_buf);
     println!("Attempting to send something");
 
-    let packet = device
-        .api
-        .transmit_request(api::BROADCAST_ADDR, 0, 0, b"HELLO FROM API")?;
+    //let packet = device
+    //    .api
+    let mut api = ApiFrame {};
+    let packet = api.transmit_request(api::BROADCAST_ADDR, 0, 0, b"HELLO FROM API")?;
     device.serial.write(&packet[..]);
     println!("{:x?}", &packet[..]);
     // let remote_name = b"MYREMOTE";
