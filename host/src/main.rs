@@ -2,7 +2,9 @@ mod api;
 mod atcommands;
 mod prelude;
 
-use api::ApiFrame;
+use api::{
+    RecieveApiFrame, TransmitApiFrame, TransmitRequestFrame, TransmitRequestOptions, TransmitStatus,
+};
 use atcommands::{AtCommand, AtCommands};
 use bytes::{BufMut, BytesMut};
 use prelude::*;
@@ -46,6 +48,28 @@ impl DigiMeshDevice {
         Ok(self.serial.write(data)?)
     }
 
+    fn recieve_atresponse(&mut self, expected_cr: usize) -> Result<()> {
+        let mut buf: [u8; 1] = [0; 1];
+        let mut cr_counter = 0;
+        loop {
+            if buf[0] == b'\r' {
+                cr_counter += 1;
+                if cr_counter == expected_cr {
+                    break;
+                }
+            }
+            self.serial.read_exact(&mut buf)?;
+            self.rx_buf.put_u8(buf[0]);
+        }
+
+        if self.rx_buf.len() < 1 {
+            return Err(Error::IOError(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "RX buf empty",
+            )));
+        }
+        Ok(())
+    }
     /// send an AT command and returns the result
     fn atcmd<'a>(&mut self, atcmd: &'a AtCommand) -> Result<()> {
         let mut apply_changes = false;
@@ -68,28 +92,7 @@ impl DigiMeshDevice {
         //println!("Sending: {:x?}", &tx_buf[..]);
 
         self.serial.write(&self.tx_buf[..])?;
-
-        let mut mini_buf: [u8; 1] = [0; 1];
-        let mut cr_counter = 0;
-        loop {
-            if mini_buf[0] == b'\r' {
-                cr_counter += 1;
-
-                if cr_counter == atcmd.rcr_len {
-                    break;
-                }
-            }
-            self.serial.read_exact(&mut mini_buf)?;
-            self.rx_buf.put_u8(mini_buf[0]);
-        }
-
-        if self.rx_buf.len() < 1 {
-            return Err(Error::IOError(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "RX buf empty",
-            )));
-        }
-
+        self.recieve_atresponse(atcmd.rcr_len)?;
         Ok(())
     }
 
@@ -111,7 +114,7 @@ impl DigiMeshDevice {
 
     fn apply_changes(&mut self) -> Result<()> {
         if self.cmd_mode == false {
-            self.command_mode(true);
+            self.command_mode(true)?;
             return Err(Error::InvalidMode("Not in command mode".to_string()));
         }
 
@@ -125,37 +128,32 @@ impl DigiMeshDevice {
 fn main() -> Result<()> {
     let mut device = DigiMeshDevice::new()?;
     // set api to 1
-    device.atcmd(&AtCommands::CmdMode(true).create())?;
+    device.command_mode(true)?;
     println!("{:x?}", device.rx_buf);
     device.atcmd(&AtCommands::AtCmd(("AP", Some(b"1"))).create())?;
     println!("{:x?}", device.rx_buf);
-    device.apply_changes();
     device.command_mode(false)?;
     println!("{:x?}", device.rx_buf);
     println!("Attempting to send something");
 
-    //let packet = device
-    //    .api
-    let mut api = ApiFrame {};
-    let packet = api.transmit_request(api::BROADCAST_ADDR, 0, 0, b"HELLO FROM API")?;
-    device.serial.write(&packet[..]);
-    println!("{:x?}", &packet[..]);
-    // let remote_name = b"MYREMOTE";
-    // let mut device = DigiMeshDevice::new()?;
-    // let test = AtCommands::AtCmd(("IP", None));
-    // let test2 = AtCommands::AtCmd(("AP", None));
-    // let rename_node = AtCommands::AtCmd(("NI", Some(remote_name)));
+    let packet = TransmitRequestFrame {
+        dest_addr: api::BROADCAST_ADDR,
+        broadcast_radius: 0,
+        options: Some(&TransmitRequestOptions {
+            disable_ack: false,
+            disable_route_discovery: false,
+            enable_unicast_nack: false,
+            enable_unicast_trace_route: false,
+            mode: api::MessagingMode::DigiMesh,
+        }),
+        payload: b"hi",
+    }
+    .gen()?;
 
-    // let discover = AtCommands::Discover(None);
-    // device.command_mode(true)?;
-    // println!("{:?}: {:?}", test, device.atcmd(&test.create())?);
-    // println!("{:?}: {:?}", test2, device.atcmd(&test2.create())?);
-    // println!(
-    //     "{:?}: {:?}",
-    //     rename_node,
-    //     device.atcmd(&rename_node.create())?
-    // );
-    // println!("{:?}: {:?}", discover, device.atcmd(&discover.create())?);
-    // device.command_mode(false)?;
+    device.send(&packet[..])?;
+    let mut status = TransmitStatus::default();
+    status.recieve(device.serial.try_clone()?);
+    println!("{:x?}", &packet[..]);
+    println!("{:x?}", status);
     Ok(())
 }
