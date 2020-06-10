@@ -61,6 +61,7 @@ pub trait RecieveApiFrame {
 
     fn id(&self) -> FrameId;
     fn summary(&self) -> ();
+    fn payload(&self) -> Result<BytesMut>;
 }
 
 pub trait TransmitApiFrame {
@@ -148,7 +149,13 @@ impl RecieveApiFrame for NullRecieve {
     }
 
     fn summary(&self) {
-        println!("{:?}", self);
+        println!("{:#?}", self);
+    }
+
+    fn payload(&self) -> Result<BytesMut> {
+        Err(Error::FrameError(
+            "Uncallabe method for Null Recieve Frame".to_string(),
+        ))
     }
 }
 
@@ -158,11 +165,12 @@ pub struct TransmitStatus {
     transmit_retry_count: u8,
     deliver_status: u8,
     discovery_status: u8,
+    payload: Option<BytesMut>,
 }
 
 impl RecieveApiFrame for TransmitStatus {
     fn summary(&self) -> () {
-        println!("{:?}", self);
+        println!("{:#?}", self);
     }
     fn id(&self) -> FrameId {
         FrameId::TransmitStatus
@@ -170,28 +178,22 @@ impl RecieveApiFrame for TransmitStatus {
 
     fn recieve(mut ser: Box<dyn SerialPort>) -> Result<Self> {
         // wait for first
-        let mut header: [u8; 3] = [0; 3];
-        loop {
-            ser.read(&mut header)?;
-            if header[0] == DELIM {
-                break;
-            } else {
-                return Err(Error::PayloadError(
-                    "Start Delimiter not found in response packet".to_string(),
-                ));
-            }
-        }
-        let length: usize = ((header[1] as usize) << 8) | (header[0] as usize);
-        println!("{}", length);
-        let mut payload: Vec<u8> = vec![0; length + 1];
-        ser.read(&mut payload[..])?;
-        println!("payload: {:x?}", payload);
+        let mut response: [u8; 11] = [0; 11];
+        ser.read_exact(&mut response)?;
         Ok(Self {
-            frame_id: payload[1],
-            transmit_retry_count: payload[4],
-            deliver_status: payload[5],
-            discovery_status: payload[6],
+            frame_id: response[4],
+            transmit_retry_count: response[7],
+            deliver_status: response[8],
+            discovery_status: response[9],
+            payload: Some(BytesMut::from(&response[..])),
         })
+    }
+
+    fn payload(&self) -> Result<BytesMut> {
+        match &self.payload {
+            Some(p) => Ok(p.clone()),
+            None => Err(Error::FrameError("Empty payload".to_string())),
+        }
     }
 }
 
