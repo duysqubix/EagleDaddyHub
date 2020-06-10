@@ -41,6 +41,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum FrameId {
     TransmitRequest,
     TransmitStatus,
+    AtCommand,
     Null,
 }
 
@@ -49,6 +50,7 @@ impl FrameId {
         match *self {
             FrameId::TransmitRequest => 0x90,
             FrameId::TransmitStatus => 0x8b,
+            FrameId::AtCommand => 0x08,
             FrameId::Null => 0xff,
         }
     }
@@ -60,7 +62,9 @@ pub trait RecieveApiFrame {
         Self: std::marker::Sized;
 
     fn id(&self) -> FrameId;
-    fn summary(&self) -> ();
+    fn summary(&self) {
+        println!("{#?", self);
+    }
     fn payload(&self) -> Result<BytesMut>;
 }
 
@@ -85,6 +89,12 @@ pub trait TransmitApiFrame {
         }
 
         Ok(0xff - (checksum as u8))
+    }
+
+    fn gen_frame_id(&self) -> u8 {
+        let mut rng = rand::thread_rng();
+        let r: u8 = rng.gen();
+        r
     }
 }
 
@@ -169,9 +179,6 @@ pub struct TransmitStatus {
 }
 
 impl RecieveApiFrame for TransmitStatus {
-    fn summary(&self) -> () {
-        println!("{:#?}", self);
-    }
     fn id(&self) -> FrameId {
         FrameId::TransmitStatus
     }
@@ -194,6 +201,36 @@ impl RecieveApiFrame for TransmitStatus {
             Some(p) => Ok(p.clone()),
             None => Err(Error::FrameError("Empty payload".to_string())),
         }
+    }
+}
+
+struct AtCommandReponse {
+    frame_id: u8,
+    at_command: u16,
+    command_status: u8,
+    command_data: Option<u8>,
+}
+
+impl RecieveApiFrame for AtCommandReponse {
+    fn id(&self) -> FrameId{
+        FrameId::AtCommandResponse
+    }
+
+    fn recieve(mut ser: Box<dyn SerialPort>) -> Result<Self>{
+        let mut buffer: [u8;64];
+        let mut mini_buf: [u8;1];
+        
+        let old_timeout = ser.timeout();
+        ser.set_timeout(std::time::Duration::from_millis(100));
+        loop{
+            match ser.read_exact(&mut mini_buf){
+                Ok(_) => (),
+                Err(ref err) => {
+                    match err
+                }
+            }
+        }
+        
     }
 }
 
@@ -275,6 +312,32 @@ impl TransmitApiFrame for TransmitRequestFrame<'_> {
         let chksum = self.calc_checksum(&packet[..])?;
         packet.put_u8(chksum);
 
+        Ok(packet)
+    }
+}
+
+pub struct AtCommandFrame<'a>(pub &'a str, pub Option<&'a [u8]>);
+impl TransmitApiFrame for AtCommandFrame<'_> {
+    fn id(&self) -> FrameId {
+        FrameId::AtCommand
+    }
+
+    fn gen(&self) -> Result<BytesMut> {
+        let mut packet = BytesMut::with_capacity(9);
+        let frame_id: u8 = self.gen_frame_id();
+        packet.put_u8(DELIM);
+        packet.put_u8(0); // length 0 just a placeholder
+        packet.put_u8(frame_id);
+        packet.put(self.0.as_bytes());
+        if let Some(param) = self.1 {
+            packet.put(&param[..])
+        }
+
+        packet[1] = (packet.len() - 2) as u8;
+        let chksum = self.calc_checksum(&packet[..])?;
+        packet.put_u8(chksum);
+        println!("{:?}", packet);
+        println!("{:x?}", &packet[..]);
         Ok(packet)
     }
 }
