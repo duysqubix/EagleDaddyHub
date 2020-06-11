@@ -5,15 +5,26 @@ use rustbee::{
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut device = DigiMeshDevice::new()?;
+    device
+        .send_frame(api::AtCommandFrame("AP", Some(b"1")))?
+        .summary();
+
+    let packet = api::TransmitRequestFrame {
+        dest_addr: api::BROADCAST_ADDR,
+        broadcast_radius: 0,
+        options: None,
+        payload: b"Hello from Rust again",
+    };
+    device.send_frame(packet)?.summary();
     // get id of device
-    let at_id = api::AtCommandFrame("ID", None);
-    let reponse = device.send_frame(at_id)?;
+    //    let at_id = api::AtCommandFrame("ID", None);
+    //  let reponse = device.send_frame(at_id)?;
+    //
+    //   let at_api = api::AtCommandFrame("AP", Some(b"1"));
+    //  let response = device.send_frame(at_api)?;
 
-    let at_api = api::AtCommandFrame("AP", Some(b"1"));
-    let response = device.send_frame(at_api)?;
-
-    reponse.summary();
-    response.summary();
+    // reponse.summary();
+    //response.summary();
     //    // set api to 1
     //    device.command_mode(true)?;
     //    println!("{:x?}", device.rx_buf);
