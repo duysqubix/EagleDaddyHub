@@ -6,8 +6,14 @@ use rustbee::{
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut device = DigiMeshDevice::new()?;
     // get id of device
-    let at_id = api::AtCommandFrame("ID", None).gen()?;
+    let at_id = api::AtCommandFrame("ID", None);
     let reponse = device.send_frame(at_id)?;
+
+    let at_api = api::AtCommandFrame("AP", Some(b"1"));
+    let response = device.send_frame(at_api)?;
+
+    reponse.summary();
+    response.summary();
     //    // set api to 1
     //    device.command_mode(true)?;
     //    println!("{:x?}", device.rx_buf);
