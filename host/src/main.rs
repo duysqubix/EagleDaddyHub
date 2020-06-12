@@ -16,6 +16,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         payload: b"Hello from Rust again",
     };
     device.send_frame(packet)?.summary();
+
+    let remote_atcmd = api::RemoteAtCommandFrame {
+        dest_addr: api::BROADCAST_ADDR,
+        options: &api::RemoteCommandOptions {
+            apply_changes: true,
+        },
+        atcmd: "NI",
+        cmd_param: None,
+    };
+
+    device.send_frame(remote_atcmd)?.summary();
     // get id of device
     //    let at_id = api::AtCommandFrame("ID", None);
     //  let reponse = device.send_frame(at_id)?;
