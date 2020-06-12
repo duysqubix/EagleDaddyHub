@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         options: &api::RemoteCommandOptions {
             apply_changes: true,
         },
-        atcmd: "NI",
+        atcmd: "ID",
         cmd_param: None,
     };
 

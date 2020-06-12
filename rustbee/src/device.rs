@@ -92,6 +92,10 @@ impl DigiMeshDevice {
             response = Box::new(api::TransmitStatus::recieve(self.serial.try_clone()?)?);
         } else if frame.id() == api::FrameId::AtCommand {
             response = Box::new(api::AtCommandResponse::recieve(self.serial.try_clone()?)?);
+        } else if frame.id() == api::FrameId::RemoteAtCommand {
+            response = Box::new(api::RemoteAtCommandResponse::recieve(
+                self.serial.try_clone()?,
+            )?);
         } else {
             response = Box::new(api::NullRecieve::recieve(self.serial.try_clone()?)?);
         }

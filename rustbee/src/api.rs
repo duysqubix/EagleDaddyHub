@@ -4,10 +4,10 @@
 //!
 //!
 
-use byteorder::ByteOrder;
 use bytes::{BufMut, BytesMut};
 use rand::Rng;
 use serialport::prelude::*;
+use std::convert::TryFrom;
 
 pub static BROADCAST_ADDR: u64 = 0xffff;
 
@@ -18,6 +18,7 @@ pub enum Error {
     FrameError(String),
     PayloadError(String),
     IOError(std::io::Error),
+    SerialPortError(serialport::Error),
 }
 
 impl std::error::Error for Error {}
@@ -28,6 +29,7 @@ impl std::fmt::Display for Error {
             Error::FrameError(ref err) => write!(f, "{}", err),
             Error::PayloadError(ref err) => write!(f, "{}", err),
             Error::IOError(ref err) => write!(f, "{}", err),
+            Error::SerialPortError(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -35,6 +37,12 @@ impl std::fmt::Display for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error::IOError(err)
+    }
+}
+
+impl From<serialport::Error> for Error {
+    fn from(err: serialport::Error) -> Self {
+        Error::SerialPortError(err)
     }
 }
 
@@ -47,6 +55,7 @@ pub enum FrameId {
     AtCommand,
     AtCommandResponse,
     RemoteAtCommand,
+    RemoteAtCommandResponse,
     Null,
 }
 
@@ -58,6 +67,7 @@ impl FrameId {
             FrameId::AtCommand => 0x08,
             FrameId::AtCommandResponse => 0x88,
             FrameId::RemoteAtCommand => 0x17,
+            FrameId::RemoteAtCommandResponse => 0x97,
             FrameId::Null => 0xff,
         }
     }
@@ -346,6 +356,81 @@ impl TransmitApiFrame for RemoteAtCommandFrame<'_> {
     }
 }
 
+/********************* Remote Command Response Frame ****************************************/
+pub struct RemoteAtCommandResponse {
+    frame_id: u8,
+    dest_addr: u64,
+    at_command: Vec<u8>,
+    command_status: u8,
+    command_data: Option<BytesMut>,
+    payload: Option<BytesMut>,
+}
+
+impl std::fmt::Debug for RemoteAtCommandResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let atcmd = std::str::from_utf8(&self.at_command[..]).ok();
+
+        let cmd_data = match self.command_data {
+            Some(ref data) => format!("{:x?}", &data[..]),
+            None => format!("None"),
+        };
+
+        f.debug_struct("AtCommandResponse")
+            .field("FrameId", &format!("0x{:02x?}", self.frame_id))
+            .field("Dest Addr", &format!("0x{:016x?}", self.dest_addr))
+            .field("AtCommand", &format!("{}", atcmd.unwrap()))
+            .field("Command Status", &format!("{}", self.command_status))
+            .field("Command Data", &cmd_data)
+            .finish()
+    }
+}
+
+impl RecieveApiFrame for RemoteAtCommandResponse {
+    fn id(&self) -> FrameId {
+        FrameId::RemoteAtCommandResponse
+    }
+
+    fn recieve(mut ser: Box<dyn SerialPort>) -> Result<Self> {
+        let mut buffer = BytesMut::with_capacity(256);
+        let mut mini_buf: [u8; 1] = [0];
+        let old_timeout = ser.timeout();
+        ser.set_timeout(std::time::Duration::from_millis(2100))?;
+        loop {
+            if let Err(_) = ser.read_exact(&mut mini_buf) {
+                break; // assuming timeout error here, could potentiall do this better
+            }
+            buffer.put_u8(mini_buf[0]);
+        }
+
+        let mut cmd_data = None;
+        if buffer.len() > 18 {
+            cmd_data = Some(BytesMut::from(&buffer[18..buffer.len() - 1]));
+        }
+        let mut at_cmd: Vec<u8> = Vec::new();
+        at_cmd.push(buffer[15]);
+        at_cmd.push(buffer[16]);
+        let dest_buf = &buffer[5..13];
+        println!("{:x?}", &buffer[..]);
+        println!("{:x?}", dest_buf);
+        let dest_addr = u64::from_be_bytes(<[u8; 8]>::try_from(dest_buf).unwrap()); // messy but works
+        ser.set_timeout(old_timeout)?;
+        Ok(Self {
+            frame_id: buffer[4],
+            dest_addr: dest_addr,
+            at_command: at_cmd,
+            command_status: buffer[17],
+            command_data: cmd_data,
+            payload: Some(buffer),
+        })
+    }
+
+    fn payload(&self) -> Result<BytesMut> {
+        match &self.payload {
+            Some(p) => Ok(p.clone()),
+            None => Err(Error::FrameError("Empty payload".to_string())),
+        }
+    }
+}
 /********************* AtCommand Frame ****************************************/
 
 pub struct AtCommandFrame<'a>(pub &'a str, pub Option<&'a [u8]>);
@@ -411,7 +496,7 @@ impl RecieveApiFrame for AtCommandResponse {
         let mut buffer = BytesMut::with_capacity(256);
         let mut mini_buf: [u8; 1] = [0];
         let old_timeout = ser.timeout();
-        ser.set_timeout(std::time::Duration::from_millis(100));
+        ser.set_timeout(std::time::Duration::from_millis(100))?;
         loop {
             if let Err(ref err) = ser.read_exact(&mut mini_buf) {
                 println!("{:?}", err);
@@ -427,7 +512,7 @@ impl RecieveApiFrame for AtCommandResponse {
         let mut at_cmd: Vec<u8> = Vec::new();
         at_cmd.push(buffer[5]);
         at_cmd.push(buffer[6]);
-        ser.set_timeout(old_timeout);
+        ser.set_timeout(old_timeout)?;
         Ok(Self {
             frame_id: buffer[4],
             at_command: at_cmd,
