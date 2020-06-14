@@ -20,6 +20,7 @@ pub enum Error {
     PayloadError(String),
     IOError(std::io::Error),
     SerialPortError(serialport::Error),
+    DerefError,
 }
 
 impl std::error::Error for Error {}
@@ -31,6 +32,7 @@ impl std::fmt::Display for Error {
             Error::PayloadError(ref err) => write!(f, "{}", err),
             Error::IOError(ref err) => write!(f, "{}", err),
             Error::SerialPortError(ref err) => write!(f, "{}", err),
+            Error::DerefError => write!(f, "Unable to deref trait"),
         }
     }
 }
