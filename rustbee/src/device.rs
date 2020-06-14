@@ -1,6 +1,7 @@
 use crate::api::{self, AtCommand, AtCommands, RecieveApiFrame};
 use bytes::{BufMut, BytesMut};
 use serialport::*;
+use std::convert::TryFrom;
 use std::thread;
 use std::time::Duration;
 
@@ -54,21 +55,30 @@ impl std::error::Error for Error {}
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct DigiMeshDevice {
-    //pub addr_64bit: u64,
-    //pub addr_16bit: u16,
-    //pub node_id: String,
-    //pub firmware_version: u16,
-    //pub software_version: u16,
+    pub addr_64bit: Option<u64>,
+    pub node_id: Option<String>,
+    pub firmware_version: Option<u16>,
+    pub hardware_version: Option<u16>,
     serial: Box<dyn SerialPort>,
     rx_buf: BytesMut,
     tx_buf: BytesMut,
 }
 
+impl std::fmt::Debug for DigiMeshDevice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DigiMeshDevice")
+            .field("addr_64bit", &format!("{:x?}", self.addr_64bit))
+            .field("node_id", &format!("{:?}", self.node_id))
+            .field("firmware_version", &format!("{:x?}", self.firmware_version))
+            .field("hardware_version", &format!("{:x?}", self.hardware_version))
+            .finish()
+    }
+}
+
 impl DigiMeshDevice {
-    #[cfg(target_os = "linux")]
-    pub fn new() -> Result<Self> {
+    pub fn new<'a>(port: &'a str, baud: u32) -> Result<Self> {
         let settings = SerialPortSettings {
-            baud_rate: 9600,
+            baud_rate: baud,
             data_bits: DataBits::Eight,
             flow_control: FlowControl::None,
             parity: Parity::None,
@@ -76,29 +86,94 @@ impl DigiMeshDevice {
             timeout: Duration::from_millis(20000),
         };
 
-        Ok(Self {
-            serial: serialport::open_with_settings("/dev/ttyUSB0", &settings)?,
+        let mut device = Self {
+            serial: serialport::open_with_settings(port, &settings)?,
             rx_buf: BytesMut::with_capacity(128),
             tx_buf: BytesMut::with_capacity(128),
-        })
+            addr_64bit: None,
+            node_id: None,
+            firmware_version: None,
+            hardware_version: None,
+        };
+        let addr = device.get_64bit_addr()?;
+        let node_id = device.get_node_id()?;
+        let hw_version = device.get_hardware_version()?;
+        let fw_version = device.get_firmware_version()?;
+
+        device.addr_64bit = Some(addr);
+        device.node_id = Some(node_id);
+        device.hardware_version = Some(hw_version);
+        device.firmware_version = Some(fw_version);
+
+        Ok(device)
     }
 
-    #[cfg(target_os = "windows")]
-    pub fn new() -> Result<Self> {
-        let settings = SerialPortSettings {
-            baud_rate: 9600,
-            data_bits: DataBits::Eight,
-            flow_control: FlowControl::None,
-            parity: Parity::None,
-            stop_bits: StopBits::One,
-            timeout: Duration::from_millis(20000),
-        };
+    pub fn get_firmware_version(&mut self) -> Result<u16> {
+        if let None = self.firmware_version {
+            let fw = self.send_frame(api::AtCommandFrame("VR", None))?;
+            let fw = fw
+                .downcast_ref::<api::AtCommandResponse>()
+                .ok_or(Error::ApiError(api::Error::DerefError))?
+                .command_data
+                .as_ref()
+                .unwrap();
+            return Ok(u16::from_be_bytes(<[u8; 2]>::try_from(&fw[..]).unwrap()));
+        }
+        Ok(self.firmware_version.unwrap())
+    }
 
-        Ok(Self {
-            serial: serialport::open_with_settings("COM1", &settings)?,
-            rx_buf: BytesMut::with_capacity(128),
-            tx_buf: BytesMut::with_capacity(128),
-        })
+    pub fn get_hardware_version(&mut self) -> Result<u16> {
+        if let None = self.hardware_version {
+            let fw = self.send_frame(api::AtCommandFrame("HV", None))?;
+            let fw = fw
+                .downcast_ref::<api::AtCommandResponse>()
+                .ok_or(Error::ApiError(api::Error::DerefError))?
+                .command_data
+                .as_ref()
+                .unwrap();
+            return Ok(u16::from_be_bytes(<[u8; 2]>::try_from(&fw[..]).unwrap()));
+        }
+        Ok(self.hardware_version.unwrap())
+    }
+
+    pub fn get_node_id(&mut self) -> Result<String> {
+        if let None = self.node_id {
+            // get node_id
+            let node_id = self.send_frame(api::AtCommandFrame("NI", None))?;
+            let node_id = node_id
+                .downcast_ref::<api::AtCommandResponse>()
+                .ok_or(Error::ApiError(api::Error::DerefError))?
+                .command_data
+                .as_ref()
+                .unwrap();
+            let node_id = std::str::from_utf8(&node_id[..])?;
+
+            return Ok(String::from(node_id));
+        }
+        Ok(self.node_id.clone().unwrap())
+    }
+
+    pub fn get_64bit_addr(&mut self) -> Result<u64> {
+        if let None = self.addr_64bit {
+            // get 64bit addr of device
+            let sh = self.send_frame(api::AtCommandFrame("SH", None))?;
+            let sl = self.send_frame(api::AtCommandFrame("SL", None))?;
+
+            let sh = sh
+                .downcast_ref::<api::AtCommandResponse>()
+                .ok_or(Error::ApiError(api::Error::DerefError))?;
+            let sl = sl
+                .downcast_ref::<api::AtCommandResponse>()
+                .ok_or(Error::ApiError(api::Error::DerefError))?;
+            let upper = sh.command_data.as_ref().unwrap();
+            let lower = sl.command_data.as_ref().unwrap();
+            let upper = u32::from_be_bytes(<[u8; 4]>::try_from(&upper[..]).unwrap()); // messy but works
+            let lower = u32::from_be_bytes(<[u8; 4]>::try_from(&lower[..]).unwrap());
+
+            let addr_64bit: u64 = ((upper as u64) << 32) | (lower as u64);
+            return Ok(addr_64bit);
+        }
+        Ok(self.addr_64bit.unwrap())
     }
 
     pub fn send<'a>(&mut self, data: &'a [u8]) -> Result<usize> {
