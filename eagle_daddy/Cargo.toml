@@ -1,5 +1,5 @@
 [package]
-name = "rf_comms"
+name = "eagledaddy"
 version = "0.1.0"
 authors = ["duysPES <duys@pioneeres.com>"]
 edition = "2018"
@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 rustbee = {path = "../rustbee"}
+lazy_static = "1.4.0"
+downcast-rs = "^1.1"

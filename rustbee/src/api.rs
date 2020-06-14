@@ -5,6 +5,7 @@
 //!
 
 use bytes::{BufMut, BytesMut};
+use downcast_rs::{impl_downcast, DowncastSync};
 use rand::Rng;
 use serialport::prelude::*;
 use std::convert::TryFrom;
@@ -73,7 +74,7 @@ impl FrameId {
     }
 }
 
-pub trait RecieveApiFrame: std::fmt::Debug {
+pub trait RecieveApiFrame: std::fmt::Debug + DowncastSync {
     fn recieve(ser: Box<dyn SerialPort>) -> Result<Self>
     where
         Self: std::marker::Sized;
@@ -84,6 +85,8 @@ pub trait RecieveApiFrame: std::fmt::Debug {
     }
     fn payload(&self) -> Result<BytesMut>;
 }
+
+impl_downcast!(sync RecieveApiFrame);
 
 pub trait TransmitApiFrame {
     fn gen(&self) -> Result<BytesMut>;
@@ -359,10 +362,10 @@ impl TransmitApiFrame for RemoteAtCommandFrame<'_> {
 /********************* Remote Command Response Frame ****************************************/
 pub struct RemoteAtCommandResponse {
     frame_id: u8,
-    dest_addr: u64,
-    at_command: Vec<u8>,
+    pub dest_addr: u64,
+    pub at_command: Vec<u8>,
     command_status: u8,
-    command_data: Option<BytesMut>,
+    pub command_data: Option<BytesMut>,
     payload: Option<BytesMut>,
 }
 
@@ -410,8 +413,6 @@ impl RecieveApiFrame for RemoteAtCommandResponse {
         at_cmd.push(buffer[15]);
         at_cmd.push(buffer[16]);
         let dest_buf = &buffer[5..13];
-        println!("{:x?}", &buffer[..]);
-        println!("{:x?}", dest_buf);
         let dest_addr = u64::from_be_bytes(<[u8; 8]>::try_from(dest_buf).unwrap()); // messy but works
         ser.set_timeout(old_timeout)?;
         Ok(Self {

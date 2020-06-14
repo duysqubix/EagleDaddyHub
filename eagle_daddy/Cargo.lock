@@ -61,6 +61,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
+name = "downcast-rs"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52ba6eb47c2131e784a38b726eb54c1e1484904f013e576a25354d0124161af6"
+
+[[package]]
+name = "eagledaddy"
+version = "0.1.0"
+dependencies = [
+ "downcast-rs",
+ "lazy_static",
+ "rustbee",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -212,18 +227,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
 
 [[package]]
-name = "rf_comms"
-version = "0.1.0"
-dependencies = [
- "rustbee",
-]
-
-[[package]]
 name = "rustbee"
 version = "0.1.0"
 dependencies = [
  "byteorder",
  "bytes",
+ "downcast-rs",
  "lazy_static",
  "rand",
  "serialport",

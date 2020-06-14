@@ -54,9 +54,14 @@ impl std::error::Error for Error {}
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct DigiMeshDevice {
-    pub serial: Box<dyn SerialPort>,
-    pub rx_buf: BytesMut,
-    pub tx_buf: BytesMut,
+    //pub addr_64bit: u64,
+    //pub addr_16bit: u16,
+    //pub node_id: String,
+    //pub firmware_version: u16,
+    //pub software_version: u16,
+    serial: Box<dyn SerialPort>,
+    rx_buf: BytesMut,
+    tx_buf: BytesMut,
 }
 
 impl DigiMeshDevice {

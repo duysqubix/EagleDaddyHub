@@ -1,22 +1,26 @@
+//mod modules;
+
 use rustbee::{
     api::{self, TransmitApiFrame},
     device::DigiMeshDevice,
 };
 
+use downcast_rs::DowncastSync;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut device = DigiMeshDevice::new()?;
-    device
-        .send_frame(api::AtCommandFrame("AP", Some(b"1")))?
-        .summary();
+    //    device
+    //        .send_frame(api::AtCommandFrame("AP", Some(b"1")))?
+    //        .summary();
 
     let packet = api::TransmitRequestFrame {
         dest_addr: api::BROADCAST_ADDR,
         broadcast_radius: 0,
         options: None,
-        payload: b"Hello from Rust again",
+        payload: b"\x00\x1a\x2b",
     };
-    device.send_frame(packet)?.summary();
-
+    let response = device.send_frame(packet)?;
+    println!("{:#x?}", response);
     let remote_atcmd = api::RemoteAtCommandFrame {
         dest_addr: api::BROADCAST_ADDR,
         options: &api::RemoteCommandOptions {
@@ -26,7 +30,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cmd_param: None,
     };
 
-    device.send_frame(remote_atcmd)?.summary();
+    let response = device.send_frame(remote_atcmd)?;
+
+    if let Some(r) = response.downcast_ref::<api::RemoteAtCommandResponse>() {
+        println!("{:?}", r.command_data);
+    }
+
     // get id of device
     //    let at_id = api::AtCommandFrame("ID", None);
     //  let reponse = device.send_frame(at_id)?;
