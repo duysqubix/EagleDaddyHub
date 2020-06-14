@@ -3,17 +3,17 @@
 use rustbee::{api, device::DigiMeshDevice};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut device = DigiMeshDevice::new()?;
+    let mut device = DigiMeshDevice::new("COM1", 9600)?;
     //    device
     //        .send_frame(api::AtCommandFrame("AP", Some(b"1")))?
     //        .summary();
+    println!("{:#?}", device);
+    // let atni = api::AtCommandFrame("NI", None);
+    // let node_id = device.send_frame(atni)?;
 
-    let atni = api::AtCommandFrame("NI", None);
-    let node_id = device.send_frame(atni)?;
-
-    if let Some(node_id) = node_id.downcast_ref::<api::AtCommandResponse>() {
-        println!("{:#?}", &node_id.command_data.as_ref().unwrap());
-    }
+    // if let Some(node_id) = node_id.downcast_ref::<api::AtCommandResponse>() {
+    //     println!("{:#?}", &node_id.command_data.as_ref().unwrap());
+    // }
     // let packet = api::TransmitRequestFrame {
     //     dest_addr: api::BROADCAST_ADDR,
     //     broadcast_radius: 0,
