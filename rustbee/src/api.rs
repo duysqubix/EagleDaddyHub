@@ -396,10 +396,8 @@ impl RecieveApiFrame for RemoteAtCommandResponse {
     }
 
     fn recieve(mut ser: Box<dyn SerialPort>) -> Result<Self> {
-        let mut buffer = BytesMut::with_capacity(256);
+        let mut buffer = BytesMut::with_capacity(1024);
         let mut mini_buf: [u8; 1] = [0];
-        let old_timeout = ser.timeout();
-        ser.set_timeout(std::time::Duration::from_millis(2000))?;
         loop {
             if let Err(err) = ser.read_exact(&mut mini_buf) {
                 if err.kind() == std::io::ErrorKind::TimedOut {
@@ -420,7 +418,6 @@ impl RecieveApiFrame for RemoteAtCommandResponse {
         at_cmd.push(buffer[16]);
         let dest_buf = &buffer[5..13];
         let dest_addr = u64::from_be_bytes(<[u8; 8]>::try_from(dest_buf).unwrap()); // messy but works
-        ser.set_timeout(old_timeout)?;
         Ok(Self {
             frame_id: buffer[4],
             dest_addr: dest_addr,
@@ -502,8 +499,6 @@ impl RecieveApiFrame for AtCommandResponse {
     fn recieve(mut ser: Box<dyn SerialPort>) -> Result<Self> {
         let mut buffer = BytesMut::with_capacity(256);
         let mut mini_buf: [u8; 1] = [0];
-        let old_timeout = ser.timeout();
-        ser.set_timeout(std::time::Duration::from_millis(100))?;
         loop {
             if let Err(err) = ser.read_exact(&mut mini_buf) {
                 if err.kind() == std::io::ErrorKind::TimedOut {
@@ -519,10 +514,12 @@ impl RecieveApiFrame for AtCommandResponse {
             cmd_data = Some(BytesMut::from(&buffer[8..buffer.len() - 1]));
         }
 
+        if buffer.len() == 0 {
+            return Err(Error::FrameError("No frame detected".to_string()));
+        }
         let mut at_cmd: Vec<u8> = Vec::new();
         at_cmd.push(buffer[5]);
         at_cmd.push(buffer[6]);
-        ser.set_timeout(old_timeout)?;
         Ok(Self {
             frame_id: buffer[4],
             at_command: at_cmd,

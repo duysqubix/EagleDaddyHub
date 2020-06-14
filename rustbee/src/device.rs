@@ -1,4 +1,4 @@
-use crate::api::{self, AtCommand, AtCommands, RecieveApiFrame};
+use crate::api::{self, AtCommand, AtCommands, RecieveApiFrame, TransmitApiFrame};
 use bytes::{BufMut, BytesMut};
 use serialport::*;
 use std::convert::TryFrom;
@@ -12,6 +12,7 @@ pub enum Error {
     DecodeError(std::str::Utf8Error),
     ApiError(api::Error),
     InvalidMode(String),
+    DiscoveryError,
 }
 
 impl From<serialport::Error> for Error {
@@ -46,6 +47,7 @@ impl std::fmt::Display for Error {
             Error::DecodeError(ref err) => write!(f, "{}", err),
             Error::InvalidMode(ref err) => write!(f, "{}", err),
             Error::ApiError(ref err) => write!(f, "{}", err),
+            Error::DiscoveryError => write!(f, "Could not complete discovery mode"),
         }
     }
 }
@@ -54,11 +56,20 @@ impl std::error::Error for Error {}
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
+pub struct RemoteDigiMeshDevice {
+    pub addr_64bit: u64,
+    pub node_id: String,
+    pub firmware_version: Option<u16>,
+    pub hardware_version: Option<u16>,
+}
+
 pub struct DigiMeshDevice {
     pub addr_64bit: Option<u64>,
     pub node_id: Option<String>,
     pub firmware_version: Option<u16>,
     pub hardware_version: Option<u16>,
+    pub nodes: Option<Vec<RemoteDigiMeshDevice>>,
     serial: Box<dyn SerialPort>,
     rx_buf: BytesMut,
     tx_buf: BytesMut,
@@ -94,6 +105,7 @@ impl DigiMeshDevice {
             node_id: None,
             firmware_version: None,
             hardware_version: None,
+            nodes: None,
         };
         let addr = device.get_64bit_addr()?;
         let node_id = device.get_node_id()?;
@@ -180,6 +192,66 @@ impl DigiMeshDevice {
         Ok(self.serial.write(data)?)
     }
 
+    pub fn discover_nodes(&mut self, timeout: Option<std::time::Duration>) -> Result<()> {
+        let discover_cmd = api::AtCommandFrame("ND", None).gen()?;
+        self.serial.write(&discover_cmd[..])?;
+        let old_timeout = self.serial.timeout();
+
+        match timeout {
+            Some(t) => self.serial.set_timeout(t)?,
+            None => self
+                .serial
+                .set_timeout(std::time::Duration::from_secs(15))?,
+        }
+
+        let mut api_responses: Vec<api::AtCommandResponse> = Vec::new();
+        let mut remote_devices: Vec<RemoteDigiMeshDevice> = Vec::new();
+        let mut break_loop = false;
+        loop {
+            if break_loop == true {
+                break;
+            }
+            println!("Iteration...");
+            let response = api::AtCommandResponse::recieve(self.serial.try_clone()?);
+
+            match response {
+                Ok(resp) => api_responses.push(resp),
+                Err(_) => {
+                    break_loop = true;
+                }
+            }
+        }
+        self.serial.set_timeout(old_timeout)?;
+
+        if api_responses.len() > 0 {
+            println!("{:?}", api_responses);
+
+            for rd in api_responses.iter() {
+                let ref buf = &rd.command_data.as_ref().unwrap();
+                let addr = u64::from_be_bytes(<[u8; 8]>::try_from(&buf[2..10]).unwrap());
+                let mut end_idx = 10;
+                for i in 10..buf.len() - 1 {
+                    if buf[i] == 0 {
+                        break;
+                    }
+                    end_idx += 1;
+                }
+                let node_id = std::str::from_utf8(&buf[10..end_idx])?;
+                let d = RemoteDigiMeshDevice {
+                    addr_64bit: addr,
+                    node_id: String::from(node_id),
+                    firmware_version: None,
+                    hardware_version: None,
+                };
+
+                remote_devices.push(d);
+            }
+            self.nodes = Some(remote_devices);
+            return Ok(());
+        }
+        Err(Error::DiscoveryError)
+    }
+
     pub fn send_frame<T: api::TransmitApiFrame>(
         &mut self,
         frame: T,
@@ -187,17 +259,25 @@ impl DigiMeshDevice {
         let packet = frame.gen()?; // creats bytes mut
         self.serial.write(&packet[..])?;
         let response: Box<dyn api::RecieveApiFrame>;
+
+        let old_timeout = self.serial.timeout();
         if frame.id() == api::FrameId::TransmitRequest {
             response = Box::new(api::TransmitStatus::recieve(self.serial.try_clone()?)?);
         } else if frame.id() == api::FrameId::AtCommand {
+            self.serial
+                .set_timeout(std::time::Duration::from_millis(100))?;
             response = Box::new(api::AtCommandResponse::recieve(self.serial.try_clone()?)?);
         } else if frame.id() == api::FrameId::RemoteAtCommand {
+            self.serial
+                .set_timeout(std::time::Duration::from_millis(3000))?;
             response = Box::new(api::RemoteAtCommandResponse::recieve(
                 self.serial.try_clone()?,
             )?);
         } else {
             response = Box::new(api::NullRecieve::recieve(self.serial.try_clone()?)?);
         }
+
+        self.serial.set_timeout(old_timeout)?;
         Ok(response)
     }
 
