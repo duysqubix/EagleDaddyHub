@@ -397,10 +397,14 @@ impl RecieveApiFrame for RemoteAtCommandResponse {
         let mut buffer = BytesMut::with_capacity(256);
         let mut mini_buf: [u8; 1] = [0];
         let old_timeout = ser.timeout();
-        ser.set_timeout(std::time::Duration::from_millis(2100))?;
+        ser.set_timeout(std::time::Duration::from_millis(2000))?;
         loop {
-            if let Err(_) = ser.read_exact(&mut mini_buf) {
-                break; // assuming timeout error here, could potentiall do this better
+            if let Err(err) = ser.read_exact(&mut mini_buf) {
+                if err.kind() == std::io::ErrorKind::TimedOut {
+                    break;
+                } else {
+                    return Err(Error::IOError(err));
+                }
             }
             buffer.put_u8(mini_buf[0]);
         }
@@ -463,11 +467,11 @@ impl TransmitApiFrame for AtCommandFrame<'_> {
 
 /******************* AtCommand Response Frame *******************/
 pub struct AtCommandResponse {
-    frame_id: u8,
-    at_command: Vec<u8>,
-    command_status: u8,
-    command_data: Option<BytesMut>,
-    payload: Option<BytesMut>,
+    pub frame_id: u8,
+    pub at_command: Vec<u8>,
+    pub command_status: u8,
+    pub command_data: Option<BytesMut>,
+    pub payload: Option<BytesMut>,
 }
 
 impl std::fmt::Debug for AtCommandResponse {
@@ -499,9 +503,12 @@ impl RecieveApiFrame for AtCommandResponse {
         let old_timeout = ser.timeout();
         ser.set_timeout(std::time::Duration::from_millis(100))?;
         loop {
-            if let Err(ref err) = ser.read_exact(&mut mini_buf) {
-                println!("{:?}", err);
-                break;
+            if let Err(err) = ser.read_exact(&mut mini_buf) {
+                if err.kind() == std::io::ErrorKind::TimedOut {
+                    break;
+                } else {
+                    return Err(Error::IOError(err));
+                }
             }
             buffer.put_u8(mini_buf[0]);
         }

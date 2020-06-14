@@ -65,6 +65,7 @@ pub struct DigiMeshDevice {
 }
 
 impl DigiMeshDevice {
+    #[cfg(target_os = "linux")]
     pub fn new() -> Result<Self> {
         let settings = SerialPortSettings {
             baud_rate: 9600,
@@ -77,6 +78,24 @@ impl DigiMeshDevice {
 
         Ok(Self {
             serial: serialport::open_with_settings("/dev/ttyUSB0", &settings)?,
+            rx_buf: BytesMut::with_capacity(128),
+            tx_buf: BytesMut::with_capacity(128),
+        })
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn new() -> Result<Self> {
+        let settings = SerialPortSettings {
+            baud_rate: 9600,
+            data_bits: DataBits::Eight,
+            flow_control: FlowControl::None,
+            parity: Parity::None,
+            stop_bits: StopBits::One,
+            timeout: Duration::from_millis(20000),
+        };
+
+        Ok(Self {
+            serial: serialport::open_with_settings("COM1", &settings)?,
             rx_buf: BytesMut::with_capacity(128),
             tx_buf: BytesMut::with_capacity(128),
         })
