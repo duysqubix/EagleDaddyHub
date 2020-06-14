@@ -8,6 +8,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //        .send_frame(api::AtCommandFrame("AP", Some(b"1")))?
     //        .summary();
     println!("{:#?}", device);
+    device.discover_nodes(None)?;
+    println!("{:#x?}", device.nodes);
     // let atni = api::AtCommandFrame("NI", None);
     // let node_id = device.send_frame(atni)?;
 
