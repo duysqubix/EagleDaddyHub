@@ -4,14 +4,6 @@
 
 RecieveFrame g_RxFrame;
 
-void setup()
-{
-    Serial.begin(115200);
-    Serial.setTimeout(100);
-    while (!Serial)
-        ;
-}
-
 void reverse(uint8_t arr[], uint8_t n)
 {
     for (uint8_t low = 0, high = n - 1; low < high; low++, high--) {
@@ -44,7 +36,11 @@ void parse_rx_packet()
 
 void transmit_request(uint8_t* data, uint8_t len)
 {
-    Serial.setTimeout(500);
+    // check to see if original master request was a broadcasted message, in
+    // that case, attach a slight delay to minimize signal colliding
+    if (g_RxFrame.recv_opts & 0x02)
+        delay(random(0,2000));
+
     uint8_t packet_len = len + 18;
     uint8_t packet[packet_len];
 
@@ -172,7 +168,7 @@ void handle_packets()
         request.module_id = (g_RxFrame.rf_data[0] << 8) | g_RxFrame.rf_data[1];
 
         if (request.module_id != MOD_ID) {
-            // firs check to see if it isn't broadcast request
+            // first check to see if it isn't broadcast request
             // check for broadcast
             // Internal Broadcast command - sends back its module_id. Must use a random number
             // as this cmd is intended to be used when host uses 'broadcast' mode, we don't want
@@ -198,45 +194,29 @@ void handle_packets()
     }
 }
 
-void debug()
+void setup()
 {
-    uint32_t upper = (g_RxFrame.source_addr >> 24);
-    uint32_t lower = g_RxFrame.source_addr & 0xffffffff;
-    Serial.print(upper, HEX);
-    Serial.print(" ");
-    Serial.print(lower, HEX);
-    Serial.print(",");
-    Serial.print(g_RxFrame.recv_opts, HEX);
-    Serial.print(", ");
-    for (int i = 0; i < MAX_RF_DATA_LEN; i++) {
-        Serial.print(g_RxFrame.rf_data[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println("");
+    Serial.begin(115200);
+    Serial.setTimeout(500);
+    while (!Serial)
+        ;
 }
-
-uint8_t buf;
 
 void loop()
 {
 
-    // put your main code here, to run repeatedly:
     if (Serial.available() > 0) {
         for (;;) {
-            buf = Serial.read();
-            if (buf == 0x7e)
+            RX_BUF = Serial.read();
+            if (RX_BUF == 0x7e)
                 break;
         }
         Serial.readBytes(HEADER, 2);
 
-        //if (HEADER[0] != 0x7e)
-        //    return;
         uint16_t buf_len = (HEADER[0] << 8) | HEADER[1];
 
         Serial.readBytes(RX_PACKET, buf_len + 1);
 
         handle_packets();
-        //Serial.read(Serial.available());
-        //        debug();
     }
 }

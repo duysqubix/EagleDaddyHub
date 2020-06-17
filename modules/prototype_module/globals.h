@@ -24,5 +24,5 @@ typedef struct {
 
 const uint16_t MOD_ID = 0x001a;
 uint8_t HEADER[3], RX_PACKET[MAX_RX_PACKET_LEN];
-
+uint8_t RX_BUF;
 #endif

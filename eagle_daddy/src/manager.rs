@@ -2,7 +2,10 @@
 
 use crate::modules::Module;
 use crate::prelude::*;
-use rustbee::device::{self, DigiMeshDevice, RemoteDigiMeshDevice};
+use rustbee::{
+    api,
+    device::{self, DigiMeshDevice, RemoteDigiMeshDevice},
+};
 use std::error;
 
 #[derive(Debug)]
@@ -62,8 +65,19 @@ impl ModuleManager {
     // In fact, don't use built in Discover mode on XBee, write custom firmware that waits for
     // command to identify itself, generating a transmit request frame with appropriate payload!
     pub fn discovery_mode(&mut self) -> Result<()> {
-        self.device.discover_nodes(None)?;
-        println!("{:#?}", self.device.nodes);
+        let broadcast_id = api::TransmitRequestFrame {
+            dest_addr: api::BROADCAST_ADDR,
+            broadcast_radius: 0,
+            options: None,
+            payload: b"\x0a\xaa",
+        };
+
+        let transmit_status = self.device.send_frame(broadcast_id)?;
+        println!("{:#x?}", transmit_status);
+
+        let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone()?)?;
+        println!("{:#x?}", reply);
+
         Ok(())
     }
 }
