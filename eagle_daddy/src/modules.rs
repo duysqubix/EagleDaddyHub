@@ -26,41 +26,9 @@ impl std::fmt::Display for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub struct Module<'a> {
-    id: u16,
-    cmd_map: HashMap<&'a str, u8>,
+#[derive(Debug)]
+pub struct Module {
+    id: u64,
+    device: device::RemoteDigiMeshDevice,
 }
 
-impl Module<'_> {
-    pub fn new<'a>(m: &'a str) -> Result<Self> {
-        let mut cmd_map: HashMap<&'static str, u8> = HashMap::new();
-        match m {
-            "prototype" => {
-                // do something here
-                cmd_map.insert("RequestMotorTime", 0x4a);
-                cmd_map.insert("RequestTime", 0x1d);
-                cmd_map.insert("RequestTempH", 0x2b);
-                cmd_map.insert("RequestDistance", 0x3c);
-
-                Ok(Self {
-                    id: 0x001a,
-                    cmd_map: cmd_map,
-                })
-            }
-            _ => Err(Error::NotValidModule),
-        }
-    }
-
-    pub fn send_cmd<'a>(
-        host: &'a mut device::DigiMeshDevice,
-        cmd: &'a str,
-        data: Option<&'a [u8]>,
-    ) {
-        // contruct payload
-        let transmit_status = api::TransmitRequestFrame{
-            dest_addr: api::BROADCAST_ADDR
-        }
-    }
-}
-//let module = Module::new("prototype");
-//let response = module.send_cmd("RequestMotorTime", Some(b"15"))?;
