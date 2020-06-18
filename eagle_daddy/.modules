@@ -1,0 +1,13 @@
+---
+- id: 26
+  device:
+    addr_64bit: 5526146544118394
+    node_id: NotSet
+    firmware_version: ~
+    hardware_version: ~
+- id: 26
+  device:
+    addr_64bit: 5526146543658141
+    node_id: NotSet
+    firmware_version: ~
+    hardware_version: ~

@@ -79,8 +79,8 @@ impl ModuleManager {
 
     /// Saves modules to disk
     pub fn dump_to_disk(&mut self) -> Result<()> {
-        let mut s = serde_yaml::to_string(&self.modules).unwrap();
-        let mut f = File::open(".modules").expect("COULD NOT OPEN FILE");
+        let s = serde_yaml::to_string(&self.modules).unwrap();
+        let mut f = File::create(".modules").expect("COULD NOT OPEN FILE");
         f.write_all(&s[..].as_bytes())
             .expect("COULD NOT WRITE TO FILE");
         Ok(())
