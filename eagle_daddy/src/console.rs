@@ -27,6 +27,13 @@ lazy_static! {
             "discover",
             (do_discovery, "Discover Modules on the network"),
         );
+        map.insert(
+            "load",
+            (
+                do_load_modules,
+                "If saved, load previously saved modules into memory",
+            ),
+        );
         map
     };
 }
@@ -64,6 +71,12 @@ impl From<manager::Error> for Error {
     fn from(err: manager::Error) -> Error {
         Error::ManagerError(err)
     }
+}
+
+/// Load modules back into memory
+fn do_load_modules(con: &mut Console, args: &Args) -> Result<()> {
+    con.manager.load_modules()?;
+    Ok(())
 }
 
 /// discover new nodes on network

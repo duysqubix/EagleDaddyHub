@@ -28,6 +28,9 @@ pub enum Error {
     DeviceError(device::Error),
     /// XBee Api Error
     ApiError(api::Error),
+
+    ///IO Error
+    IOError(std::io::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -37,6 +40,7 @@ impl std::fmt::Display for Error {
             Error::UnknownUID(ref uid) => write!(f, "Unknown UID: 0x{:x?}", uid),
             Error::ApiError(ref err) => write!(f, "{}", err),
             Error::DeviceError(ref err) => write!(f, "{}", err),
+            Error::IOError(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -50,6 +54,12 @@ impl From<device::Error> for Error {
 impl From<api::Error> for Error {
     fn from(err: api::Error) -> Error {
         Error::ApiError(err)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error::IOError(err)
     }
 }
 
@@ -80,9 +90,20 @@ impl ModuleManager {
     /// Saves modules to disk
     pub fn dump_to_disk(&mut self) -> Result<()> {
         let s = serde_yaml::to_string(&self.modules).unwrap();
-        let mut f = File::create(".modules").expect("COULD NOT OPEN FILE");
-        f.write_all(&s[..].as_bytes())
-            .expect("COULD NOT WRITE TO FILE");
+        let mut f = File::create(".modules")?;
+        f.write_all(&s[..].as_bytes())?;
+        Ok(())
+    }
+
+    pub fn load_modules(&mut self) -> Result<()> {
+        let mut f = File::open(".modules")?;
+
+        let mut modules = String::new();
+        f.read_to_string(&mut modules)?;
+        let module_vec: Vec<Module> = serde_yaml::from_str(&modules).unwrap();
+
+        self.modules = module_vec;
+
         Ok(())
     }
 
@@ -100,11 +121,12 @@ impl ModuleManager {
 
         loop {
             let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone().unwrap());
-
             match reply {
                 Ok(resp) => {
+                    let module_id = ((resp.rf_data[0] as u16) << 8) | (resp.rf_data[1] as u16);
+
                     let module = Module {
-                        id: ((resp.rf_data[0] as u16) << 8) | (resp.rf_data[1] as u16),
+                        id: module_id,
                         device: device::RemoteDigiMeshDevice {
                             addr_64bit: resp.dest_addr,
                             node_id: "NotSet".to_string(),
