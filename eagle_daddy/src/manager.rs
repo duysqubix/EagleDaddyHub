@@ -3,7 +3,7 @@
 use crate::modules::Module;
 use crate::prelude::*;
 use rustbee::{
-    api,
+    api::{self, RecieveApiFrame},
     device::{self, DigiMeshDevice, RemoteDigiMeshDevice},
 };
 use std::error;
@@ -18,8 +18,10 @@ pub enum Error {
     ///
     /// Recieved an unknown UID from slave device
     UnknownUID(Uid),
-    /// XBee API error
-    ApiError(device::Error),
+    /// XBee Device error
+    DeviceError(device::Error),
+    /// XBee Api Error
+    ApiError(api::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -28,12 +30,19 @@ impl std::fmt::Display for Error {
             Error::NoDetectedModules => write!(f, "No valid modules detected"),
             Error::UnknownUID(ref uid) => write!(f, "Unknown UID: 0x{:x?}", uid),
             Error::ApiError(ref err) => write!(f, "{}", err),
+            Error::DeviceError(ref err) => write!(f, "{}", err),
         }
     }
 }
 
 impl From<device::Error> for Error {
     fn from(err: device::Error) -> Error {
+        Error::DeviceError(err)
+    }
+}
+
+impl From<api::Error> for Error {
+    fn from(err: api::Error) -> Error {
         Error::ApiError(err)
     }
 }
@@ -75,7 +84,7 @@ impl ModuleManager {
         let transmit_status = self.device.send_frame(broadcast_id)?;
         println!("{:#x?}", transmit_status);
 
-        let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone()?)?;
+        let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone().unwrap())?;
         println!("{:#x?}", reply);
 
         Ok(())

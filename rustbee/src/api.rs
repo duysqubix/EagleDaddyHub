@@ -54,6 +54,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, PartialEq)]
 pub enum FrameId {
     TransmitRequest,
+    RecieveRequest,
     TransmitStatus,
     AtCommand,
     AtCommandResponse,
@@ -65,7 +66,8 @@ pub enum FrameId {
 impl FrameId {
     fn id(&self) -> u8 {
         match *self {
-            FrameId::TransmitRequest => 0x90,
+            FrameId::TransmitRequest => 0x10,
+            FrameId::RecieveRequest => 0x90,
             FrameId::TransmitStatus => 0x8b,
             FrameId::AtCommand => 0x08,
             FrameId::AtCommandResponse => 0x88,
@@ -307,6 +309,66 @@ impl TransmitApiFrame for TransmitRequestFrame<'_> {
         packet.put_u8(chksum);
 
         Ok(packet)
+    }
+}
+/********************* Recieve Request ****************************************/
+
+pub struct RecieveRequestFrame {
+    pub dest_addr: u64,
+    pub recv_options: u8,
+    pub rf_data: BytesMut,
+    pub payload: BytesMut,
+}
+
+impl std::fmt::Debug for RecieveRequestFrame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RecieveRequestFrame")
+            .field("DestAddr", &format!("0x{:08x?}", self.dest_addr))
+            .field("Recv_Options", &format!("{}", self.recv_options))
+            .field("RF Data", &format!("{:x?}", self.payload))
+            .finish()
+    }
+}
+
+impl RecieveApiFrame for RecieveRequestFrame {
+    fn id(&self) -> FrameId {
+        FrameId::RecieveRequest
+    }
+
+    fn payload(&self) -> Result<BytesMut> {
+        Ok(self.payload.clone())
+    }
+
+    fn recieve(mut ser: Box<dyn SerialPort>) -> Result<Self> {
+        let mut buffer = BytesMut::with_capacity(128);
+        let mut mini_buf: [u8; 1] = [0];
+
+        loop {
+            if let Err(err) = ser.read_exact(&mut mini_buf) {
+                if err.kind() == std::io::ErrorKind::TimedOut {
+                    break;
+                } else {
+                    return Err(Error::IOError(err));
+                }
+            }
+
+            buffer.put_u8(mini_buf[0]);
+        }
+
+        if buffer.len() < 16 {
+            return Err(Error::FrameError("invalid frame detected".to_string()));
+        }
+
+        let dest_addr = u64::from_be_bytes(<[u8; 8]>::try_from(&buffer[4..12]).unwrap());
+        let recv_options = buffer[14];
+        let rf_data = BytesMut::from(&buffer[15..buffer.len() - 2]);
+
+        Ok(Self {
+            dest_addr: dest_addr,
+            recv_options: recv_options,
+            rf_data: rf_data,
+            payload: buffer,
+        })
     }
 }
 

@@ -70,7 +70,7 @@ pub struct DigiMeshDevice {
     pub firmware_version: Option<u16>,
     pub hardware_version: Option<u16>,
     pub nodes: Option<Vec<RemoteDigiMeshDevice>>,
-    serial: Box<dyn SerialPort>,
+    pub serial: Box<dyn SerialPort>,
     rx_buf: BytesMut,
     tx_buf: BytesMut,
 }
