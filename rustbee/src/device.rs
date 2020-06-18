@@ -1,5 +1,6 @@
 use crate::api::{self, AtCommand, AtCommands, RecieveApiFrame, TransmitApiFrame};
 use bytes::{BufMut, BytesMut};
+use serde::{Deserialize, Serialize};
 use serialport::*;
 use std::convert::TryFrom;
 use std::thread;
@@ -56,7 +57,7 @@ impl std::error::Error for Error {}
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RemoteDigiMeshDevice {
     pub addr_64bit: u64,
     pub node_id: String,

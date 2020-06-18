@@ -5,6 +5,7 @@
 //!
 
 use rustbee::{api, device};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 static MODULE_PROTOTYPE: u16 = 0x001a;
@@ -26,7 +27,7 @@ impl std::fmt::Display for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Module {
     pub id: u16,
     pub device: device::RemoteDigiMeshDevice,

@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::io::{self, Write};
 
 pub type Result<T> = std::result::Result<T, Error>;
-pub type ProcessCmd = fn(&mut Console, &Vec<&str>) -> Result<()>;
+pub type ProcessCmd = fn(&mut Console, &Args) -> Result<()>;
 
 lazy_static! {
     pub static ref COMMAND_MAP: HashMap<&'static str, (ProcessCmd, &'static str)> = {
@@ -67,32 +67,40 @@ impl From<manager::Error> for Error {
 }
 
 /// discover new nodes on network
-fn do_discovery(con: &mut Console, cmds: &Vec<&str>) -> Result<()> {
-    let ref device = con.manager.device;
+fn do_discovery(con: &mut Console, args: &Args) -> Result<()> {
     con.manager.discovery_mode()?;
+
+    if args.sub_args.len() > 0 {
+        let subcmds: Vec<&str> = args.sub_args.iter().map(|s| s as &str).collect();
+
+        if subcmds.contains(&"-save") {
+            // after discovery save devices to disk
+            con.manager.dump_to_disk()?;
+        }
+    }
 
     Ok(())
 }
 
 ///clear screen
-fn do_clear(_con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_clear(_con: &mut Console, _args: &Args) -> Result<()> {
     println!("\x1B[2J");
     Ok(())
 }
 
 /// exit interactive mode
-fn do_exit(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_exit(con: &mut Console, _args: &Args) -> Result<()> {
     con.repl_loop = false;
     Ok(())
 }
 
 /// attempt to scan for modules on all valid cs pins
-fn do_scan(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_scan(con: &mut Console, _args: &Args) -> Result<()> {
     Ok(())
 }
 
 /// print all valid commands
-fn do_help(_con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_help(_con: &mut Console, _args: &Args) -> Result<()> {
     let mut help_str = String::with_capacity(1024);
     help_str.push_str("Module Manager Console v1.0\n\n");
     help_str.push_str("Valid Commands: \n");
@@ -107,7 +115,7 @@ fn do_help(_con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
 }
 
 /// show list of all connected modules
-fn do_list(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_list(con: &mut Console, _args: &Args) -> Result<()> {
     let ref module_list = con.manager.modules;
 
     if module_list.len() == 0 {
@@ -119,6 +127,35 @@ fn do_list(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
     }
     println!("\nModules:\n{}", list);
     Ok(())
+}
+
+#[derive(Debug)]
+pub struct Args {
+    pub main_arg: String,
+    pub sub_args: Vec<String>,
+}
+
+impl Args {
+    fn new(cmds: Vec<&str>) -> Self {
+        let mut subcmds: Vec<String> = Vec::new();
+        let main_arg: &str = "";
+        if cmds.len() == 0 {
+            return Self {
+                main_arg: "".to_string(),
+                sub_args: Vec::new(),
+            };
+        }
+
+        for subcmd in cmds.iter() {
+            if &subcmd[0..1] == "-" {
+                subcmds.push(subcmd.to_string());
+            }
+        }
+        Self {
+            main_arg: String::from(cmds[0]),
+            sub_args: subcmds,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -161,7 +198,10 @@ impl Console {
         let cmds = cmds.collect::<Vec<&str>>();
         if cmds.len() > 0 {
             let result = match COMMAND_MAP.get(cmds[0]) {
-                Some(func) => func.0(self, &cmds),
+                Some(func) => {
+                    let args = Args::new(cmds);
+                    func.0(self, &args)
+                }
                 None => Err(Error::InvalidCommand),
             };
             return result;

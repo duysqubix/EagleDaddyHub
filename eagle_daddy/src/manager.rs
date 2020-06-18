@@ -7,7 +7,12 @@ use rustbee::{
     api::{self, RecieveApiFrame},
     device::{self, DigiMeshDevice, RemoteDigiMeshDevice},
 };
+use serde::{Deserialize, Serialize};
+use serde_yaml;
 use std::error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::BufReader;
 
 #[derive(Debug)]
 pub enum Error {
@@ -71,6 +76,16 @@ impl ModuleManager {
             modules: Vec::new(),
         })
     }
+
+    /// Saves modules to disk
+    pub fn dump_to_disk(&mut self) -> Result<()> {
+        let mut s = serde_yaml::to_string(&self.modules).unwrap();
+        let mut f = File::open(".modules").expect("COULD NOT OPEN FILE");
+        f.write_all(&s[..].as_bytes())
+            .expect("COULD NOT WRITE TO FILE");
+        Ok(())
+    }
+
     /// discovers nodes on the network by querying the module_id of each node in range
     pub fn discovery_mode(&mut self) -> Result<()> {
         let broadcast_id = api::TransmitRequestFrame {
