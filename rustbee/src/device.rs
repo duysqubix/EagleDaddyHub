@@ -107,11 +107,11 @@ impl DigiMeshDevice {
             hardware_version: None,
             nodes: None,
         };
+
         let addr = device.get_64bit_addr()?;
         let node_id = device.get_node_id()?;
         let hw_version = device.get_hardware_version()?;
         let fw_version = device.get_firmware_version()?;
-
         device.addr_64bit = Some(addr);
         device.node_id = Some(node_id);
         device.hardware_version = Some(hw_version);

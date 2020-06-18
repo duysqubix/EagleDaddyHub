@@ -134,7 +134,7 @@ impl Console {
         Ok(Self {
             prompt: "mm> ".to_string(),
             input_buf: String::new(),
-            manager: ModuleManager::new("/dev/ttyUSB0", 9600)?,
+            manager: ModuleManager::new("COM1", 115200)?,
             repl_loop: true,
         })
     }
