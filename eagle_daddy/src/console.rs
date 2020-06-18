@@ -115,7 +115,7 @@ fn do_list(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
     }
     let mut list = String::with_capacity(1024);
     for module in con.manager.modules.iter() {
-        list.push_str(&format!("{:?}\n", module));
+        list.push_str(&format!("{:#?}\n", module));
     }
     println!("\nModules:\n{}", list);
     Ok(())

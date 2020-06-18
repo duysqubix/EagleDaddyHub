@@ -28,7 +28,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Module {
-    id: u64,
-    device: device::RemoteDigiMeshDevice,
+    pub id: u16,
+    pub device: device::RemoteDigiMeshDevice,
 }
 
+impl Module {}

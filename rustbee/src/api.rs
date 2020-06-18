@@ -324,8 +324,9 @@ impl std::fmt::Debug for RecieveRequestFrame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RecieveRequestFrame")
             .field("DestAddr", &format!("0x{:08x?}", self.dest_addr))
-            .field("Recv_Options", &format!("{}", self.recv_options))
-            .field("RF Data", &format!("{:x?}", self.payload))
+            .field("Recv_Options", &format!("0x{:02x}", self.recv_options))
+            .field("RF Data", &format!("{:x?}", &self.rf_data[..]))
+            .field("Payload", &format!("{:x?}", &self.payload[..]))
             .finish()
     }
 }
@@ -340,34 +341,28 @@ impl RecieveApiFrame for RecieveRequestFrame {
     }
 
     fn recieve(mut ser: Box<dyn SerialPort>) -> Result<Self> {
-        let mut buffer = BytesMut::with_capacity(128);
-        let mut mini_buf: [u8; 1] = [0];
+        let old_timeout = ser.timeout();
+        ser.set_timeout(std::time::Duration::from_millis(6000))?;
+        let mut header: [u8; 3] = [0, 0, 0];
 
-        loop {
-            if let Err(err) = ser.read_exact(&mut mini_buf) {
-                if err.kind() == std::io::ErrorKind::TimedOut {
-                    break;
-                } else {
-                    return Err(Error::IOError(err));
-                }
-            }
-
-            buffer.put_u8(mini_buf[0]);
+        ser.read_exact(&mut header)?;
+        if header[0] != DELIM {
+            return Err(Error::FrameError("invalid frame".to_string()));
         }
 
-        if buffer.len() < 16 {
-            return Err(Error::FrameError("invalid frame detected".to_string()));
-        }
+        let p_len = ((header[1] as u16) << 8) | (header[2] as u16);
+        let mut buffer = vec![0; (p_len + 1) as usize];
+        ser.read_exact(&mut buffer)?;
 
-        let dest_addr = u64::from_be_bytes(<[u8; 8]>::try_from(&buffer[4..12]).unwrap());
-        let recv_options = buffer[14];
-        let rf_data = BytesMut::from(&buffer[15..buffer.len() - 2]);
-
+        let dest_addr = u64::from_be_bytes(<[u8; 8]>::try_from(&buffer[1..9]).unwrap());
+        let recv_options = buffer[11];
+        let rf_data = BytesMut::from(&buffer[12..buffer.len() - 1]);
+        ser.set_timeout(old_timeout)?;
         Ok(Self {
             dest_addr: dest_addr,
             recv_options: recv_options,
             rf_data: rf_data,
-            payload: buffer,
+            payload: BytesMut::from(&buffer[..]),
         })
     }
 }

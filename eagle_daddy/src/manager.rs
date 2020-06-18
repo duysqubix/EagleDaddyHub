@@ -2,6 +2,7 @@
 
 use crate::modules::Module;
 use crate::prelude::*;
+use downcast_rs::DowncastSync;
 use rustbee::{
     api::{self, RecieveApiFrame},
     device::{self, DigiMeshDevice, RemoteDigiMeshDevice},
@@ -70,9 +71,7 @@ impl ModuleManager {
             modules: Vec::new(),
         })
     }
-    // TODO once in discovery mode completes, take nodes and store them persistently
-    // In fact, don't use built in Discover mode on XBee, write custom firmware that waits for
-    // command to identify itself, generating a transmit request frame with appropriate payload!
+    /// discovers nodes on the network by querying the module_id of each node in range
     pub fn discovery_mode(&mut self) -> Result<()> {
         let broadcast_id = api::TransmitRequestFrame {
             dest_addr: api::BROADCAST_ADDR,
@@ -82,11 +81,28 @@ impl ModuleManager {
         };
 
         let transmit_status = self.device.send_frame(broadcast_id)?;
-        println!("{:#x?}", transmit_status);
+        //println!("{:#x?}", transmit_status);
 
-        let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone().unwrap())?;
-        println!("{:#x?}", reply);
+        loop {
+            let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone().unwrap());
 
+            match reply {
+                Ok(resp) => {
+                    let module = Module {
+                        id: ((resp.rf_data[0] as u16) << 8) | (resp.rf_data[1] as u16),
+                        device: device::RemoteDigiMeshDevice {
+                            addr_64bit: resp.dest_addr,
+                            node_id: "NotSet".to_string(),
+                            firmware_version: None,
+                            hardware_version: None,
+                        },
+                    };
+
+                    self.modules.push(module);
+                }
+                Err(_) => break,
+            }
+        }
         Ok(())
     }
 }
