@@ -21,7 +21,6 @@ lazy_static! {
         map.insert("exit", (do_exit, "Exit interactive mode"));
         map.insert("help", (do_help, "Display this screen"));
         map.insert("list", (do_list, "List all connected modules"));
-        map.insert("scan", (do_scan, "Scan all connected modules"));
         map.insert("clear", (do_clear, "Clear the screen"));
         map.insert(
             "discover",
@@ -34,6 +33,8 @@ lazy_static! {
                 "If saved, load previously saved modules into memory",
             ),
         );
+
+        map.insert("save", (do_save_modules, "Save current modules to disk"));
         map
     };
 }
@@ -73,9 +74,21 @@ impl From<manager::Error> for Error {
     }
 }
 
+/// save current modules to disk
+fn do_save_modules(con: &mut Console, _args: &Args) -> Result<()> {
+    if con.manager.modules.len() == 0 {
+        println!("no modules found");
+    } else {
+        con.manager.dump_to_disk()?;
+        println!("saved");
+    }
+    Ok(())
+}
 /// Load modules back into memory
 fn do_load_modules(con: &mut Console, args: &Args) -> Result<()> {
     con.manager.load_modules()?;
+    println!("loaded");
+
     Ok(())
 }
 
@@ -88,7 +101,7 @@ fn do_discovery(con: &mut Console, args: &Args) -> Result<()> {
 
         if subcmds.contains(&"-save") {
             // after discovery save devices to disk
-            con.manager.dump_to_disk()?;
+            do_save_modules(con, args)?;
         }
     }
 
@@ -104,11 +117,7 @@ fn do_clear(_con: &mut Console, _args: &Args) -> Result<()> {
 /// exit interactive mode
 fn do_exit(con: &mut Console, _args: &Args) -> Result<()> {
     con.repl_loop = false;
-    Ok(())
-}
-
-/// attempt to scan for modules on all valid cs pins
-fn do_scan(con: &mut Console, _args: &Args) -> Result<()> {
+    println!("goodbye");
     Ok(())
 }
 
@@ -128,7 +137,18 @@ fn do_help(_con: &mut Console, _args: &Args) -> Result<()> {
 }
 
 /// show list of all connected modules
-fn do_list(con: &mut Console, _args: &Args) -> Result<()> {
+fn do_list(con: &mut Console, args: &Args) -> Result<()> {
+    if args.sub_args.len() > 0 {
+        let subcmds: Vec<&str> = args.sub_args.iter().map(|s| s as &str).collect();
+
+        if subcmds.contains(&"-clear") {
+            // clear current list and return
+            con.manager.modules.clear();
+            println!("cleared");
+            return Ok(());
+        }
+    }
+
     let ref module_list = con.manager.modules;
 
     if module_list.len() == 0 {
