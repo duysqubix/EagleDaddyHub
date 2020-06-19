@@ -7,7 +7,6 @@
 //!
 
 use crate::manager::{self, ModuleManager};
-use crate::modules::{self};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -45,7 +44,6 @@ pub enum Error {
     ManagerError(manager::Error),
     InvalidCommand,
     EmptyInput,
-    NullActiveModule,
 }
 
 impl std::fmt::Display for Error {
@@ -55,7 +53,6 @@ impl std::fmt::Display for Error {
             Error::InvalidCommand => write!(f, "Invalid Command"),
             Error::EmptyInput => write!(f, ""),
             Error::ManagerError(ref err) => write!(f, "{}", err),
-            Error::NullActiveModule => write!(f, "No Active Module"),
         }
     }
 }
@@ -85,7 +82,7 @@ fn do_save_modules(con: &mut Console, _args: &Args) -> Result<()> {
     Ok(())
 }
 /// Load modules back into memory
-fn do_load_modules(con: &mut Console, args: &Args) -> Result<()> {
+fn do_load_modules(con: &mut Console, _args: &Args) -> Result<()> {
     con.manager.load_modules()?;
     println!("loaded");
 
@@ -171,7 +168,6 @@ pub struct Args {
 impl Args {
     fn new(cmds: Vec<&str>) -> Self {
         let mut subcmds: Vec<String> = Vec::new();
-        let main_arg: &str = "";
         if cmds.len() == 0 {
             return Self {
                 main_arg: "".to_string(),

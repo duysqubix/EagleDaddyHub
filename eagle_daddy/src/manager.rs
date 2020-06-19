@@ -1,18 +1,14 @@
 #![deny(missing_docs)]
 
 use crate::modules::{self, Module};
-use crate::prelude::*;
-use downcast_rs::DowncastSync;
 use rustbee::{
     api::{self, RecieveApiFrame},
-    device::{self, DigiMeshDevice, RemoteDigiMeshDevice},
+    device::{self, DigiMeshDevice},
 };
-use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::error;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::BufReader;
 
 #[derive(Debug)]
 pub enum Error {
@@ -32,8 +28,6 @@ pub enum Error {
 
     /// Module Error
     ModuleError(modules::Error),
-
-    /// Manager Error
 }
 
 impl std::fmt::Display for Error {
@@ -129,7 +123,12 @@ impl ModuleManager {
         //println!("{:#x?}", transmit_status);
 
         loop {
-            let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone().expect("Could not clone serial"));
+            let reply = api::RecieveRequestFrame::recieve(
+                self.device
+                    .serial
+                    .try_clone()
+                    .expect("Could not clone serial"),
+            );
             match reply {
                 Ok(resp) => {
                     println!("Recieve Status: 0x{:02x}", resp.recv_options);
