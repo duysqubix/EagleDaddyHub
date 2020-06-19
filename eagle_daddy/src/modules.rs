@@ -6,21 +6,24 @@
 
 use rustbee::{api, device};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
-static MODULE_PROTOTYPE: u16 = 0x001a;
-static MODULE_DEERFEEDER: u16 = 0x002b;
+use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum Error {
-    NotValidModule,
+    DeviceError(device::Error),
+}
+
+impl From<device::Error> for Error {
+    fn from(err: device::Error) -> Error {
+        Error::DeviceError(err)
+    }
 }
 
 impl std::error::Error for Error {}
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Error::NotValidModule => write!(f, "Not a valid module option"),
+            Error::DeviceError(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -33,4 +36,80 @@ pub struct Module {
     pub device: device::RemoteDigiMeshDevice,
 }
 
-impl Module {}
+impl PartialOrd for Module {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.device.addr_64bit.partial_cmp(&other.device.addr_64bit)
+    }
+}
+
+impl PartialEq for Module {
+    fn eq(&self, other: &Self) -> bool {
+        self.device.addr_64bit == other.device.addr_64bit
+    }
+}
+impl Module {
+    pub fn get_info(&mut self, master: &mut device::DigiMeshDevice) -> Result<()> {
+        // ask for node_id
+        let mut attempt = false;
+
+        print!("Query ID: {:x?} => ", self.device.addr_64bit);
+        let atresponse = master.send_frame(api::RemoteAtCommandFrame {
+            dest_addr: self.device.addr_64bit,
+            options: &api::RemoteCommandOptions {
+                apply_changes: false,
+            },
+            atcmd: "NI",
+            cmd_param: None,
+        })?;
+
+        if let Some(resp) = atresponse.downcast_ref::<api::RemoteAtCommandResponse>() {
+            if let Some(ref cmd_data) = resp.command_data {
+                let id = std::str::from_utf8(&cmd_data[..]);
+                if let Ok(id) = id {
+                    self.device.node_id = String::from(id);
+                    attempt = true;
+                }
+            }
+        }
+        println!("{}", attempt);
+        attempt = false;
+
+        print!("Query HW: {:x?} => ", self.device.addr_64bit);
+        let atresponse = master.send_frame(api::RemoteAtCommandFrame {
+            dest_addr: self.device.addr_64bit,
+            options: &api::RemoteCommandOptions {
+                apply_changes: false,
+            },
+            atcmd: "HV",
+            cmd_param: None,
+        })?;
+        if let Some(resp) = atresponse.downcast_ref::<api::RemoteAtCommandResponse>() {
+            if let Some(ref cmd_data) = resp.command_data {
+                let hv = u16::from_be_bytes(<[u8; 2]>::try_from(&cmd_data[..]).unwrap());
+                self.device.hardware_version = Some(hv);
+                attempt = true;
+            }
+        }
+        println!("{}", attempt);
+        attempt = false;
+
+        print!("Query VR: {:x?} => ", self.device.addr_64bit);
+        let atresponse = master.send_frame(api::RemoteAtCommandFrame {
+            dest_addr: self.device.addr_64bit,
+            options: &api::RemoteCommandOptions {
+                apply_changes: false,
+            },
+            atcmd: "VR",
+            cmd_param: None,
+        })?;
+        if let Some(resp) = atresponse.downcast_ref::<api::RemoteAtCommandResponse>() {
+            if let Some(ref cmd_data) = resp.command_data {
+                let vr = u16::from_be_bytes(<[u8; 2]>::try_from(&cmd_data[..]).unwrap());
+                self.device.firmware_version = Some(vr);
+                attempt = true;
+            }
+        }
+        println!("{}", attempt);
+        Ok(())
+    }
+}

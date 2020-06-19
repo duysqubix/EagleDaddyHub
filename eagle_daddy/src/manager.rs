@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use crate::modules::Module;
+use crate::modules::{self, Module};
 use crate::prelude::*;
 use downcast_rs::DowncastSync;
 use rustbee::{
@@ -20,27 +20,30 @@ pub enum Error {
     ///
     /// There were no valid uids detected.
     NoDetectedModules,
-    /// Unknown UID
-    ///
-    /// Recieved an unknown UID from slave device
-    UnknownUID(Uid),
+
     /// XBee Device error
     DeviceError(device::Error),
+
     /// XBee Api Error
     ApiError(api::Error),
 
     ///IO Error
     IOError(std::io::Error),
+
+    /// Module Error
+    ModuleError(modules::Error),
+
+    /// Manager Error
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Error::NoDetectedModules => write!(f, "No valid modules detected"),
-            Error::UnknownUID(ref uid) => write!(f, "Unknown UID: 0x{:x?}", uid),
             Error::ApiError(ref err) => write!(f, "{}", err),
             Error::DeviceError(ref err) => write!(f, "{}", err),
             Error::IOError(ref err) => write!(f, "{}", err),
+            Error::ModuleError(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -60,6 +63,12 @@ impl From<api::Error> for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
         Error::IOError(err)
+    }
+}
+
+impl From<modules::Error> for Error {
+    fn from(err: modules::Error) -> Error {
+        Error::ModuleError(err)
     }
 }
 
@@ -116,13 +125,14 @@ impl ModuleManager {
             payload: b"\x0a\xaa",
         };
 
-        let transmit_status = self.device.send_frame(broadcast_id)?;
+        let _transmit_status = self.device.send_frame(broadcast_id)?;
         //println!("{:#x?}", transmit_status);
 
         loop {
-            let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone().unwrap());
+            let reply = api::RecieveRequestFrame::recieve(self.device.serial.try_clone().expect("Could not clone serial"));
             match reply {
                 Ok(resp) => {
+                    println!("Recieve Status: 0x{:02x}", resp.recv_options);
                     let module_id = ((resp.rf_data[0] as u16) << 8) | (resp.rf_data[1] as u16);
 
                     let module = Module {
@@ -135,10 +145,17 @@ impl ModuleManager {
                         },
                     };
 
-                    self.modules.push(module);
+                    if self.modules.contains(&module) == false {
+                        self.modules.push(module);
+                    }
                 }
                 Err(_) => break,
             }
+        }
+
+        // now query information for each module
+        for module in self.modules.iter_mut() {
+            module.get_info(&mut self.device)?;
         }
         Ok(())
     }
