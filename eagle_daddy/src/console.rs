@@ -7,13 +7,13 @@
 //!
 
 use crate::manager::{self, ModuleManager};
-use crate::modules::{self};
 use lazy_static::lazy_static;
+use rustbee::device;
 use std::collections::HashMap;
 use std::io::{self, Write};
 
 pub type Result<T> = std::result::Result<T, Error>;
-pub type ProcessCmd = fn(&mut Console, &Vec<&str>) -> Result<()>;
+pub type ProcessCmd = fn(&mut Console, &Args) -> Result<()>;
 
 lazy_static! {
     pub static ref COMMAND_MAP: HashMap<&'static str, (ProcessCmd, &'static str)> = {
@@ -21,12 +21,21 @@ lazy_static! {
         map.insert("exit", (do_exit, "Exit interactive mode"));
         map.insert("help", (do_help, "Display this screen"));
         map.insert("list", (do_list, "List all connected modules"));
-        map.insert("scan", (do_scan, "Scan all connected modules"));
         map.insert("clear", (do_clear, "Clear the screen"));
         map.insert(
             "discover",
             (do_discovery, "Discover Modules on the network"),
         );
+        map.insert(
+            "load",
+            (
+                do_load_modules,
+                "If saved, load previously saved modules into memory",
+            ),
+        );
+
+        map.insert("save", (do_save_modules, "Save current modules to disk"));
+        map.insert("send", (do_module_send, "Send explicit commands to module"));
         map
     };
 }
@@ -35,9 +44,10 @@ lazy_static! {
 pub enum Error {
     IOError(std::io::Error),
     ManagerError(manager::Error),
+    DeviceError(device::Error),
     InvalidCommand,
+    InvalidSubArgs(String),
     EmptyInput,
-    NullActiveModule,
 }
 
 impl std::fmt::Display for Error {
@@ -47,7 +57,9 @@ impl std::fmt::Display for Error {
             Error::InvalidCommand => write!(f, "Invalid Command"),
             Error::EmptyInput => write!(f, ""),
             Error::ManagerError(ref err) => write!(f, "{}", err),
-            Error::NullActiveModule => write!(f, "No Active Module"),
+            Error::DeviceError(ref err) => write!(f, "{}", err),
+
+            Error::InvalidSubArgs(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -66,33 +78,118 @@ impl From<manager::Error> for Error {
     }
 }
 
+impl From<device::Error> for Error {
+    fn from(err: device::Error) -> Error {
+        Error::DeviceError(err)
+    }
+}
+
+fn do_module_send(con: &mut Console, args: &Args) -> Result<()> {
+    if args.sub_args.len() < 3 {
+        return Err(Error::InvalidSubArgs(
+            "Invalid subarguments length".to_string(),
+        ));
+    }
+
+    let node_ids = con
+        .manager
+        .get_node_ids()?
+        .iter()
+        .map(|s| s.to_lowercase())
+        .collect::<Vec<String>>();
+    let device_id = &args.sub_args[0];
+    let device_action = &args.sub_args[1];
+
+    if node_ids.contains(&device_id) == true {
+        // appropriate slave device
+
+        if &device_action[..] == "request" {
+            let request_option = &args.sub_args[2];
+            let selected_module = con.manager.get_module(device_id);
+
+            if let None = selected_module {
+                return Err(Error::ManagerError(manager::Error::NoDetectedModules));
+            }
+            let module_idx = selected_module.unwrap();
+            match &request_option[..] {
+                "th" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::RequestTH)?,
+                "time" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::RequestTime)?,
+                "dist" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::RequestDist)?,
+                "motor" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::RequestMotor)?,
+
+                "invalid" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::InvalidCmd)?,
+
+                _ => (),
+            }
+        } else {
+            return Err(Error::InvalidSubArgs(
+                "not a valid action for node_id".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// save current modules to disk
+fn do_save_modules(con: &mut Console, _args: &Args) -> Result<()> {
+    if con.manager.modules.len() == 0 {
+        println!("no modules found");
+    } else {
+        con.manager.dump_to_disk()?;
+        println!("saved");
+    }
+    Ok(())
+}
+/// Load modules back into memory
+fn do_load_modules(con: &mut Console, _args: &Args) -> Result<()> {
+    con.manager.load_modules()?;
+    println!("loaded");
+
+    Ok(())
+}
+
 /// discover new nodes on network
-fn do_discovery(con: &mut Console, cmds: &Vec<&str>) -> Result<()> {
-    let ref device = con.manager.device;
+fn do_discovery(con: &mut Console, args: &Args) -> Result<()> {
     con.manager.discovery_mode()?;
+
+    if args.sub_args.len() > 0 {
+        let subcmds: Vec<&str> = args.sub_args.iter().map(|s| s as &str).collect();
+
+        if subcmds.contains(&"save") {
+            // after discovery save devices to disk
+            do_save_modules(con, args)?;
+        }
+    }
 
     Ok(())
 }
 
 ///clear screen
-fn do_clear(_con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_clear(_con: &mut Console, _args: &Args) -> Result<()> {
     println!("\x1B[2J");
     Ok(())
 }
 
 /// exit interactive mode
-fn do_exit(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_exit(con: &mut Console, _args: &Args) -> Result<()> {
     con.repl_loop = false;
-    Ok(())
-}
-
-/// attempt to scan for modules on all valid cs pins
-fn do_scan(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+    println!("goodbye");
     Ok(())
 }
 
 /// print all valid commands
-fn do_help(_con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_help(_con: &mut Console, _args: &Args) -> Result<()> {
     let mut help_str = String::with_capacity(1024);
     help_str.push_str("Module Manager Console v1.0\n\n");
     help_str.push_str("Valid Commands: \n");
@@ -107,7 +204,18 @@ fn do_help(_con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
 }
 
 /// show list of all connected modules
-fn do_list(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
+fn do_list(con: &mut Console, args: &Args) -> Result<()> {
+    if args.sub_args.len() > 0 {
+        let subcmds: Vec<&str> = args.sub_args.iter().map(|s| s as &str).collect();
+
+        if subcmds.contains(&"clear") {
+            // clear current list and return
+            con.manager.modules.clear();
+            println!("cleared");
+            return Ok(());
+        }
+    }
+
     let ref module_list = con.manager.modules;
 
     if module_list.len() == 0 {
@@ -119,6 +227,36 @@ fn do_list(con: &mut Console, _cmds: &Vec<&str>) -> Result<()> {
     }
     println!("\nModules:\n{}", list);
     Ok(())
+}
+
+#[derive(Debug)]
+pub struct Args {
+    pub main_arg: String,
+    pub sub_args: Vec<String>,
+}
+
+impl Args {
+    fn new(cmds: Vec<&str>) -> Self {
+        let mut subcmds: Vec<String> = Vec::new();
+        if cmds.len() == 0 {
+            return Self {
+                main_arg: "".to_string(),
+                sub_args: Vec::new(),
+            };
+        }
+
+        for subcmd in cmds.iter() {
+            // if &subcmd[0..1] == "-" {
+            //     subcmds.push(subcmd.to_string());
+            // }
+            subcmds.push(subcmd.to_string());
+        }
+        subcmds.remove(0);
+        Self {
+            main_arg: String::from(cmds[0]),
+            sub_args: subcmds,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -161,7 +299,10 @@ impl Console {
         let cmds = cmds.collect::<Vec<&str>>();
         if cmds.len() > 0 {
             let result = match COMMAND_MAP.get(cmds[0]) {
-                Some(func) => func.0(self, &cmds),
+                Some(func) => {
+                    let args = Args::new(cmds);
+                    func.0(self, &args)
+                }
                 None => Err(Error::InvalidCommand),
             };
             return result;
