@@ -2,7 +2,6 @@
 #include <Arduino.h>
 #include <string.h>
 #include <Wire.h>        // Library  I2C
-#include <DFRobot_LCD.h> // Library LCD
 #include <DHT.h>         // Library Hum&Temp
 
 #define DS3231_I2C_ADDRESS 0x68 // RTC Address
@@ -153,7 +152,7 @@ void process_cmd(MasterRequest *request)
     if (cmd == RequestTH)
     {
         float temp = dht.readTemperature();
-        flat hum = dht.readHumidity();
+        float hum = dht.readHumidity();
 
         uint8_t *t, *h;
         t = (uint8_t *)(&temp);
@@ -165,7 +164,7 @@ void process_cmd(MasterRequest *request)
         memcpy(to_send + sizeof(float), h, sizeof(float));
 
         transmit_request(to_send, sizeof(to_send));
-
+       }
         // Send back real time as described by World Clock
         //
         // Response:
@@ -217,7 +216,7 @@ void process_cmd(MasterRequest *request)
             // duration is the time (in microseconds) from the sending
             // of the ping to the reception of its echo off of an object.
             pinMode(ECHO_PIN, INPUT);
-            duration = pulseIn(echoPin, HIGH);
+            duration = pulseIn(ECHO_PIN, HIGH);
 
             // Convert the time into a distance
             cm = (duration / 2) / 29.1; // Divide by 29.1 or multiply by 0.0343
