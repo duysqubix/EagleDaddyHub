@@ -8,6 +8,7 @@
 
 use crate::manager::{self, ModuleManager};
 use lazy_static::lazy_static;
+use rustbee::device;
 use std::collections::HashMap;
 use std::io::{self, Write};
 
@@ -34,6 +35,7 @@ lazy_static! {
         );
 
         map.insert("save", (do_save_modules, "Save current modules to disk"));
+        map.insert("send", (do_module_send, "Send explicit commands to module"));
         map
     };
 }
@@ -42,7 +44,9 @@ lazy_static! {
 pub enum Error {
     IOError(std::io::Error),
     ManagerError(manager::Error),
+    DeviceError(device::Error),
     InvalidCommand,
+    InvalidSubArgs(String),
     EmptyInput,
 }
 
@@ -53,6 +57,9 @@ impl std::fmt::Display for Error {
             Error::InvalidCommand => write!(f, "Invalid Command"),
             Error::EmptyInput => write!(f, ""),
             Error::ManagerError(ref err) => write!(f, "{}", err),
+            Error::DeviceError(ref err) => write!(f, "{}", err),
+
+            Error::InvalidSubArgs(ref err) => write!(f, "{}", err),
         }
     }
 }
@@ -69,6 +76,69 @@ impl From<manager::Error> for Error {
     fn from(err: manager::Error) -> Error {
         Error::ManagerError(err)
     }
+}
+
+impl From<device::Error> for Error {
+    fn from(err: device::Error) -> Error {
+        Error::DeviceError(err)
+    }
+}
+
+fn do_module_send(con: &mut Console, args: &Args) -> Result<()> {
+    if args.sub_args.len() < 3 {
+        return Err(Error::InvalidSubArgs(
+            "Invalid subarguments length".to_string(),
+        ));
+    }
+
+    let node_ids = con
+        .manager
+        .get_node_ids()?
+        .iter()
+        .map(|s| s.to_lowercase())
+        .collect::<Vec<String>>();
+    let device_id = &args.sub_args[0];
+    let device_action = &args.sub_args[1];
+
+    if node_ids.contains(&device_id) == true {
+        // appropriate slave device
+
+        if &device_action[..] == "request" {
+            let request_option = &args.sub_args[2];
+            let selected_module = con.manager.get_module(device_id);
+
+            if let None = selected_module {
+                return Err(Error::ManagerError(manager::Error::NoDetectedModules));
+            }
+            let module_idx = selected_module.unwrap();
+            match &request_option[..] {
+                "th" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::RequestTH)?,
+                "time" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::RequestTime)?,
+                "dist" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::RequestDist)?,
+                "motor" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::RequestMotor)?,
+
+                "invalid" => con
+                    .manager
+                    .request(module_idx, manager::ModuleCommands::InvalidCmd)?,
+
+                _ => (),
+            }
+        } else {
+            return Err(Error::InvalidSubArgs(
+                "not a valid action for node_id".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 /// save current modules to disk
@@ -96,7 +166,7 @@ fn do_discovery(con: &mut Console, args: &Args) -> Result<()> {
     if args.sub_args.len() > 0 {
         let subcmds: Vec<&str> = args.sub_args.iter().map(|s| s as &str).collect();
 
-        if subcmds.contains(&"-save") {
+        if subcmds.contains(&"save") {
             // after discovery save devices to disk
             do_save_modules(con, args)?;
         }
@@ -138,7 +208,7 @@ fn do_list(con: &mut Console, args: &Args) -> Result<()> {
     if args.sub_args.len() > 0 {
         let subcmds: Vec<&str> = args.sub_args.iter().map(|s| s as &str).collect();
 
-        if subcmds.contains(&"-clear") {
+        if subcmds.contains(&"clear") {
             // clear current list and return
             con.manager.modules.clear();
             println!("cleared");
@@ -176,10 +246,12 @@ impl Args {
         }
 
         for subcmd in cmds.iter() {
-            if &subcmd[0..1] == "-" {
-                subcmds.push(subcmd.to_string());
-            }
+            // if &subcmd[0..1] == "-" {
+            //     subcmds.push(subcmd.to_string());
+            // }
+            subcmds.push(subcmd.to_string());
         }
+        subcmds.remove(0);
         Self {
             main_arg: String::from(cmds[0]),
             sub_args: subcmds,

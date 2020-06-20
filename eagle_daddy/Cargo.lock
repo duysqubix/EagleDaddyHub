@@ -76,6 +76,7 @@ checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
 name = "eagledaddy"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "downcast-rs",
  "lazy_static",
  "rustbee",
