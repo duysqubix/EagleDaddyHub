@@ -2,6 +2,7 @@
 
 use crate::modules::{self, Module};
 use bytes::BytesMut;
+use chrono::{DateTime, Datelike, Local, TimeZone, Timelike};
 use rustbee::{
     api::{self, RecieveApiFrame},
     device::{self, DigiMeshDevice},
@@ -79,17 +80,19 @@ pub enum ModuleCommands {
     RequestTH,
     RequestDist,
     RequestMotor,
+    SetTime,
     InvalidCmd,
 }
 
 impl ModuleCommands {
     pub fn value(&self) -> u8 {
         match *self {
-            ModuleCommands::RequestTH => 0x2b,
-            ModuleCommands::RequestTime => 0x1d,
-            ModuleCommands::RequestDist => 0x3c,
-            ModuleCommands::RequestMotor => 0x4a,
-            ModuleCommands::InvalidCmd => 0x00,
+            ModuleCommands::RequestTH => 0x2b,    // returns temp and humidity
+            ModuleCommands::RequestTime => 0x1d,  // returns current time from RTC
+            ModuleCommands::RequestDist => 0x3c,  // returns distance in cm
+            ModuleCommands::RequestMotor => 0x4a, // returns motor time in s (how long it should stay on)
+            ModuleCommands::InvalidCmd => 0x00,   // debug
+            ModuleCommands::SetTime => 0x5e,      // sets RTC with current module
         }
     }
 }
@@ -168,8 +171,66 @@ impl ModuleManager {
         Ok(response)
     }
 
-    pub fn request(&mut self, module_idx: usize, cmd: ModuleCommands) -> Result<()> {
-        // request temp and humditity
+    pub fn set(
+        &mut self,
+        module_idx: usize,
+        cmd: ModuleCommands,
+    ) -> Result<api::RecieveRequestFrame> {
+        let m = self.modules.get(module_idx).unwrap();
+
+        let mut payload: BytesMut = BytesMut::from(&vec![0 as u8; 16][..]);
+        let dt: DateTime<Local> = Local::now();
+
+        let seconds = dt.second() as u8;
+        let minute = dt.minute() as u8;
+        let hour = dt.hour() as u8;
+        let day = dt.day() as u8;
+        let month = dt.month() as u8;
+        let year = dt.year() as u16;
+
+        payload[0] = (m.id >> 8) as u8;
+        payload[1] = (m.id as u8) & 0xff;
+        payload[2] = cmd.value();
+        payload[3] = seconds;
+        payload[4] = minute;
+        payload[5] = hour;
+        payload[6] = day;
+        payload[7] = month;
+        payload[8] = (year >> 8) as u8;
+        payload[9] = (year & 0xff) as u8;
+
+        let transmit_request = api::TransmitRequestFrame {
+            dest_addr: m.device.addr_64bit,
+            options: None,
+            broadcast_radius: 0,
+            payload: &payload[..],
+        };
+
+        let response = self.transmit_request(transmit_request)?;
+        // check to make sure response is correct length
+        if response.rf_data.len() < 4 {
+            return Err(Error::InvalidResponse(format!(
+                "RF data length is wrong: {}",
+                response.rf_data.len()
+            )));
+        }
+
+        if response.rf_data[2] == 0xff {
+            // device returned error, now we can return error code
+            let err_code = response.rf_data[3];
+            return Err(Error::DeviceError(device::Error::RemoteDeviceError(
+                format!("device returned error code: {}", err_code),
+            )));
+        }
+        //println!("{:x?}:{:x?}", &response.dest_addr, &response.rf_data[..]);
+        Ok(response)
+    }
+
+    pub fn request(
+        &mut self,
+        module_idx: usize,
+        cmd: ModuleCommands,
+    ) -> Result<api::RecieveRequestFrame> {
         let m = self.modules.get(module_idx).unwrap(); // this should be safe...
 
         let mut payload: BytesMut = BytesMut::from(&vec![0 as u8; 8][..]);
@@ -200,8 +261,8 @@ impl ModuleManager {
                 format!("device returned error code: {}", err_code),
             )));
         }
-        println!("{:x?}:{:x?}", &response.dest_addr, &response.rf_data[..]);
-        Ok(())
+        //println!("{:x?}:{:x?}", &response.dest_addr, &response.rf_data[..]);
+        Ok(response)
     }
 
     /// discovers nodes on the network by querying the module_id of each node in range
