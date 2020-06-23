@@ -165,8 +165,7 @@ impl ModuleManager {
         request: api::TransmitRequestFrame,
     ) -> Result<api::RecieveRequestFrame> {
         let _ = self.device.send_frame(request)?;
-        let response =
-            api::RecieveRequestFrame::recieve(self.device.serial.try_clone().unwrap()).unwrap();
+        let response = api::RecieveRequestFrame::recieve(self.device.serial.try_clone().unwrap())?;
 
         Ok(response)
     }
@@ -233,7 +232,7 @@ impl ModuleManager {
     ) -> Result<api::RecieveRequestFrame> {
         let m = self.modules.get(module_idx).unwrap(); // this should be safe...
 
-        let mut payload: BytesMut = BytesMut::from(&vec![0 as u8; 8][..]);
+        let mut payload: BytesMut = BytesMut::from(&vec![0 as u8; 16][..]);
         payload[0] = (m.id >> 8) as u8;
         payload[1] = (m.id as u8) & 0xff;
         payload[2] = cmd.value();

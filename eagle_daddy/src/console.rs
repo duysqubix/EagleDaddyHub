@@ -148,14 +148,66 @@ fn do_module_send(con: &mut Console, args: &Args) -> Result<()> {
                     println!("Module Time: {:?}", module_time);
                 }
                 "dist" => {
-                    let _response = con
+                    let response = con
                         .manager
                         .request(module_idx, manager::ModuleCommands::RequestDist)?;
+
+                    let dist_cm: f32 =
+                        f32::from_le_bytes(<[u8; 4]>::try_from(&response.rf_data[2..6]).unwrap());
+                    println!(
+                        "Detected Distance: {:.2}cm/{:.2}in",
+                        dist_cm,
+                        ((dist_cm as f32) * 0.39)
+                    );
                 }
                 "motor" => {
                     let _response = con
                         .manager
                         .request(module_idx, manager::ModuleCommands::RequestMotor)?;
+                }
+
+                "all" => {
+                    let th = con
+                        .manager
+                        .request(module_idx, manager::ModuleCommands::RequestTH)?;
+
+                    let temp = f32::from_le_bytes(<[u8; 4]>::try_from(&th.rf_data[0..4]).unwrap());
+                    let humidity =
+                        f32::from_le_bytes(<[u8; 4]>::try_from(&th.rf_data[4..8]).unwrap());
+
+                    println!("Temperature: {}C\nHumdity: {}%", temp, humidity);
+
+                    let time = con
+                        .manager
+                        .request(module_idx, manager::ModuleCommands::RequestTime)?;
+                    // firs two bytes is module_id
+                    let ref d = time.rf_data;
+                    let sec = d[2];
+                    let min = d[3];
+                    let hour = d[4];
+                    let day = d[5];
+                    let month = d[6];
+                    let year = ((d[7] as u16) << 8) | (d[8] as u16);
+
+                    let module_time: NaiveDateTime = NaiveDate::from_ymd(
+                        year as i32,
+                        month as u32,
+                        day as u32,
+                    )
+                    .and_hms(hour as u32, min as u32, sec as u32);
+                    println!("Module Time: {:?}", module_time);
+
+                    let dist = con
+                        .manager
+                        .request(module_idx, manager::ModuleCommands::RequestDist)?;
+
+                    let dist_cm: f32 =
+                        f32::from_le_bytes(<[u8; 4]>::try_from(&dist.rf_data[2..6]).unwrap());
+                    println!(
+                        "Detected Distance: {:.2}cm/{:.2}in",
+                        dist_cm,
+                        ((dist_cm as f32) * 0.39)
+                    );
                 }
 
                 "invalid" => {
