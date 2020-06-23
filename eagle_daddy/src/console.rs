@@ -7,9 +7,11 @@
 //!
 
 use crate::manager::{self, ModuleManager};
+use chrono::{NaiveDate, NaiveDateTime};
 use lazy_static::lazy_static;
 use rustbee::device;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::io::{self, Write};
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -112,23 +114,73 @@ fn do_module_send(con: &mut Console, args: &Args) -> Result<()> {
             }
             let module_idx = selected_module.unwrap();
             match &request_option[..] {
-                "th" => con
-                    .manager
-                    .request(module_idx, manager::ModuleCommands::RequestTH)?,
-                "time" => con
-                    .manager
-                    .request(module_idx, manager::ModuleCommands::RequestTime)?,
-                "dist" => con
-                    .manager
-                    .request(module_idx, manager::ModuleCommands::RequestDist)?,
-                "motor" => con
-                    .manager
-                    .request(module_idx, manager::ModuleCommands::RequestMotor)?,
+                "th" => {
+                    let response = con
+                        .manager
+                        .request(module_idx, manager::ModuleCommands::RequestTH)?;
 
-                "invalid" => con
-                    .manager
-                    .request(module_idx, manager::ModuleCommands::InvalidCmd)?,
+                    let temp =
+                        f32::from_le_bytes(<[u8; 4]>::try_from(&response.rf_data[0..4]).unwrap());
+                    let humidity =
+                        f32::from_le_bytes(<[u8; 4]>::try_from(&response.rf_data[4..8]).unwrap());
 
+                    println!("Temperature: {}C\nHumdity: {}%", temp, humidity);
+                }
+                "time" => {
+                    let response = con
+                        .manager
+                        .request(module_idx, manager::ModuleCommands::RequestTime)?;
+                    // firs two bytes is module_id
+                    let ref d = response.rf_data;
+                    let sec = d[2];
+                    let min = d[3];
+                    let hour = d[4];
+                    let day = d[5];
+                    let month = d[6];
+                    let year = ((d[7] as u16) << 8) | (d[8] as u16);
+
+                    let module_time: NaiveDateTime = NaiveDate::from_ymd(
+                        year as i32,
+                        month as u32,
+                        day as u32,
+                    )
+                    .and_hms(hour as u32, min as u32, sec as u32);
+                    println!("Module Time: {:?}", module_time);
+                }
+                "dist" => {
+                    let _response = con
+                        .manager
+                        .request(module_idx, manager::ModuleCommands::RequestDist)?;
+                }
+                "motor" => {
+                    let _response = con
+                        .manager
+                        .request(module_idx, manager::ModuleCommands::RequestMotor)?;
+                }
+
+                "invalid" => {
+                    let _response = con
+                        .manager
+                        .request(module_idx, manager::ModuleCommands::InvalidCmd)?;
+                }
+
+                _ => (),
+            }
+        } else if &device_action[..] == "set" {
+            let set_option = &args.sub_args[2];
+            let selected_module = con.manager.get_module(device_id);
+            if let None = selected_module {
+                return Err(Error::ManagerError(manager::Error::NoDetectedModules));
+            }
+            let module_idx = selected_module.unwrap();
+
+            match &set_option[..] {
+                "time" => {
+                    let response = con
+                        .manager
+                        .set(module_idx, manager::ModuleCommands::SetTime)?;
+                    println!("{:?}", response.rf_data);
+                }
                 _ => (),
             }
         } else {
