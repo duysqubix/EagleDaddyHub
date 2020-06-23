@@ -2,7 +2,7 @@
 #ifndef __GLOBALS_H__
 #define __GLOBALS_H__
 
-#define MAX_RF_DATA_LEN 8
+#define MAX_RF_DATA_LEN 16
 #define MAX_RX_PACKET_LEN 64
 
 typedef unsigned long long uint64_t;
@@ -19,7 +19,7 @@ typedef struct {
 typedef struct {
     uint16_t module_id;
     uint8_t cmd;
-    uint8_t args[5];
+    uint8_t args[MAX_RF_DATA_LEN-3];
 } MasterRequest;
 
 const uint16_t MOD_ID = 0x001a;
