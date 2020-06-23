@@ -5,6 +5,9 @@
 #define MAX_RF_DATA_LEN 16
 #define MAX_RX_PACKET_LEN 64
 
+#define EEMEM_MOTOR_TIME_ADDR 0x00;
+#define EEME_MOTOR_SCH_ADDR 0x01;
+
 typedef unsigned long long uint64_t;
 typedef unsigned long uint32_t;
 typedef unsigned int uint16_t;

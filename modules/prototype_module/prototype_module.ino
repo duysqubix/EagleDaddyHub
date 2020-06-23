@@ -4,12 +4,13 @@
 #include <Wire.h> // Library  I2C
 #include <string.h>
 #include <ds3231.h> // RTC
+#include <EEPROM.h>
 
 #define DS3231_I2C_ADDRESS 0x68 // RTC Address
 #define DHTPIN 7 // Hum & Temp Pin (DHT Sensor)
 #define DHTTYPE DHT11 // DHT 11  sensor
-#define TRIG_PIN 11
-#define ECHO_PIN 12
+#define TRIG_PIN 9
+#define ECHO_PIN 10
 
 RecieveFrame g_RxFrame;
 DHT dht(DHTPIN, DHTTYPE);
@@ -240,7 +241,7 @@ void process_cmd(MasterRequest* request)
     //Repsonse:
     // [mod_id, distance(cm)]
     else if (cmd == RequestDist) {
-        long cm, duration;
+        float cm, duration;
         digitalWrite(TRIG_PIN, LOW);
         delayMicroseconds(5);
         digitalWrite(TRIG_PIN, HIGH);
@@ -250,14 +251,14 @@ void process_cmd(MasterRequest* request)
         // Read the signal from the sensor: a HIGH pulse whose
         // duration is the time (in microseconds) from the sending
         // of the ping to the reception of its echo off of an object.
-        pinMode(ECHO_PIN, INPUT);
         duration = pulseIn(ECHO_PIN, HIGH);
 
         // Convert the time into a distance
-        cm = (duration / 2) / 29.1; // Divide by 29.1 or multiply by 0.0343
-        uint8_t to_send[sizeof(long)];
-
-        memcpy(to_send, &cm, sizeof(long));
+        cm = (float)duration *0.034/2.0; // Divide by 29.1 or multiply by 0.0343
+        uint8_t to_send[sizeof(float)+2];
+        to_send[0] = 0x00;
+        to_send[1] = 0x1a;
+        memcpy(to_send+2, &cm, sizeof(float));
         transmit_request(to_send, sizeof(to_send));
     } else {
         uint8_t to_send[5] = { 0x00, 0x1a, 0xff, 0x2 }; // unknown command
@@ -304,8 +305,12 @@ void handle_packets()
     }
 }
 
+unsigned long TIMER_START = 0;
+unsigned long INTERVAL = 1000 * 60* 15;
 void setup()
 {
+    uint8_t motor_time;
+    
     Wire.begin();
     dht.begin();
     DS3231_init(DS3231_INTCN);
@@ -319,6 +324,17 @@ void setup()
 
 void loop()
 {
+    
+    //unsigned long current = millis();
+    //
+    //if((unsigned long)(current-TIMER_START) >= INTERVAL){
+    //    // Interval time has passed. Here you can query RTC and adjust 
+    //    // interval value to attempt to mimick passage of time accurately
+    //    struct ts tmp;
+    //    DS3231_get(&tmp);
+
+    //    TIMER_START current;
+    //}
 
     if (Serial.available() > 0) {
         for (;;) {

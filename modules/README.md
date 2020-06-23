@@ -25,3 +25,13 @@ Deer Feeder Module (0x002b)
 
     Master -
     [0x00, 0x2b]
+
+
+
+
+Some metadata is stored on uC in case of power shut off - these values need to be read in order to 
+activate some activity without human interaction..
+
+Prototype Module:
+    * Relay Timer ( times for motor to turn on stored, in seconds)
+    * Relay Schedule (allows up to 10 times a day, that will causes relay to start for _RELAY_TIMER_ time) 
