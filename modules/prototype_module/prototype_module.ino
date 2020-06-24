@@ -11,6 +11,7 @@
 #define DHTTYPE DHT11 // DHT 11  sensor
 #define TRIG_PIN 9
 #define ECHO_PIN 10
+#define RELAY_PIN 11
 
 RecieveFrame g_RxFrame;
 DHT dht(DHTPIN, DHTTYPE);
@@ -232,7 +233,9 @@ void process_cmd(MasterRequest* request)
     // Response:
     // [mod_id, time(s)]
     else if (cmd == RequestMotor) {
-        uint8_t to_send[] = { 0x00, 0x1a, 0x00, 0x0c };
+        digitalWrite(RELAY_PIN, !digitalRead(RELAY_PIN));
+        
+        uint8_t to_send[] = { 0x00, 0x1a, '0', 'K', '\r', '\n'};
         transmit_request(to_send, sizeof(to_send));
     }
 
@@ -318,6 +321,7 @@ void setup()
     Serial.setTimeout(500);
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
+    pinMode(RELAY_PIN, OUTPUT);
     while (!Serial)
         ;
 }
