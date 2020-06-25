@@ -240,6 +240,10 @@ fn do_module_send(con: &mut Console, args: &Args) -> Result<()> {
                 "not a valid action for node_id".to_string(),
             ));
         }
+    } else {
+        return Err(Error::InvalidSubArgs(
+            "no node id found by that name".into(),
+        ));
     }
 
     Ok(())
