@@ -285,7 +285,10 @@ impl ModuleManager {
             );
             match reply {
                 Ok(resp) => {
-                    println!("Recieve Status: 0x{:02x}", resp.recv_options);
+                    println!(
+                        "Responding [{:16x}:0x{:02x}]",
+                        resp.dest_addr, resp.recv_options
+                    );
                     let module_id = ((resp.rf_data[0] as u16) << 8) | (resp.rf_data[1] as u16);
 
                     let module = Module {
