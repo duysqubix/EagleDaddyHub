@@ -4,9 +4,10 @@
 
 #define MAX_RF_DATA_LEN 16
 #define MAX_RX_PACKET_LEN 64
+#define MAX_SCHEDULE_TIMES 4
 
-#define EEMEM_MOTOR_TIME_ADDR 0x00;
-#define EEME_MOTOR_SCH_ADDR 0x01;
+#define EEMEM_MOTOR_TIME_ADDR 0x00
+#define EEMEM_MOTOR_SCH_ADDR 0x01
 
 typedef unsigned long long uint64_t;
 typedef unsigned long uint32_t;
@@ -25,7 +26,14 @@ typedef struct {
     uint8_t args[MAX_RF_DATA_LEN-3];
 } MasterRequest;
 
+
+typedef struct{
+    uint8_t hour;
+    uint8_t min;
+} ScheduleTime;
+
 const uint16_t MOD_ID = 0x001a;
 uint8_t HEADER[3], RX_PACKET[MAX_RX_PACKET_LEN];
 uint8_t RX_BUF;
+
 #endif
