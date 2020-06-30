@@ -161,9 +161,10 @@ fn do_module_send(con: &mut Console, args: &Args) -> Result<()> {
                     );
                 }
                 "motor" => {
-                    let _response = con
+                    let response = con
                         .manager
                         .request(module_idx, manager::ModuleCommands::RequestMotor)?;
+                    println!("{:?}", &response.rf_data[..]);
                 }
 
                 "all" => {
@@ -228,9 +229,25 @@ fn do_module_send(con: &mut Console, args: &Args) -> Result<()> {
 
             match &set_option[..] {
                 "time" => {
-                    let response = con
-                        .manager
-                        .set(module_idx, manager::ModuleCommands::SetTime)?;
+                    let response =
+                        con.manager
+                            .set(module_idx, manager::ModuleCommands::SetTime, None)?;
+                    println!("{:?}", response.rf_data);
+                }
+                "times" => {
+                    let response = con.manager.set(
+                        module_idx,
+                        manager::ModuleCommands::SetSchedule,
+                        Some(&args.sub_args),
+                    )?;
+                    println!("{:?}", response.rf_data);
+                }
+                "motortime" => {
+                    let response = con.manager.set(
+                        module_idx,
+                        manager::ModuleCommands::SetMotorTime,
+                        Some(&args.sub_args),
+                    )?;
                     println!("{:?}", response.rf_data);
                 }
                 _ => (),

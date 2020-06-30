@@ -81,6 +81,8 @@ pub enum ModuleCommands {
     RequestDist,
     RequestMotor,
     SetTime,
+    SetSchedule,
+    SetMotorTime,
     InvalidCmd,
 }
 
@@ -93,6 +95,8 @@ impl ModuleCommands {
             ModuleCommands::RequestMotor => 0x4a, // returns motor time in s (how long it should stay on)
             ModuleCommands::InvalidCmd => 0x00,   // debug
             ModuleCommands::SetTime => 0x5e,      // sets RTC with current module
+            ModuleCommands::SetSchedule => 0x6c,  // sets the scheduling when to turn on motor
+            ModuleCommands::SetMotorTime => 0x7a, // sets how long the motor is on:w
         }
     }
 }
@@ -174,29 +178,61 @@ impl ModuleManager {
         &mut self,
         module_idx: usize,
         cmd: ModuleCommands,
+        args: Option<&Vec<String>>,
     ) -> Result<api::RecieveRequestFrame> {
         let m = self.modules.get(module_idx).unwrap();
 
         let mut payload: BytesMut = BytesMut::from(&vec![0 as u8; 16][..]);
-        let dt: DateTime<Local> = Local::now();
-
-        let seconds = dt.second() as u8;
-        let minute = dt.minute() as u8;
-        let hour = dt.hour() as u8;
-        let day = dt.day() as u8;
-        let month = dt.month() as u8;
-        let year = dt.year() as u16;
-
         payload[0] = (m.id >> 8) as u8;
         payload[1] = (m.id as u8) & 0xff;
         payload[2] = cmd.value();
-        payload[3] = seconds;
-        payload[4] = minute;
-        payload[5] = hour;
-        payload[6] = day;
-        payload[7] = month;
-        payload[8] = (year >> 8) as u8;
-        payload[9] = (year & 0xff) as u8;
+
+        match cmd {
+            ModuleCommands::SetTime => {
+                let dt: DateTime<Local> = Local::now();
+
+                let seconds = dt.second() as u8;
+                let minute = dt.minute() as u8;
+                let hour = dt.hour() as u8;
+                let day = dt.day() as u8;
+                let month = dt.month() as u8;
+                let year = dt.year() as u16;
+
+                payload[3] = seconds;
+                payload[4] = minute;
+                payload[5] = hour;
+                payload[6] = day;
+                payload[7] = month;
+                payload[8] = (year >> 8) as u8;
+                payload[9] = (year & 0xff) as u8;
+                Ok(())
+            }
+            ModuleCommands::SetSchedule => {
+                // helelo
+                payload[3] = 9;
+                payload[4] = 00;
+                payload[5] = 12;
+                payload[6] = 00;
+                payload[7] = 15;
+                payload[8] = 00;
+                payload[9] = 18;
+                payload[10] = 00;
+
+                Ok(())
+            }
+            ModuleCommands::SetMotorTime => {
+                if let Some(args) = args {
+                    if args.len() < 4 {
+                        return Err(Error::NoDetectedModules);
+                    }
+                    payload[3] = args[3].parse::<u8>().unwrap();
+                } else {
+                    payload[3] = 3;
+                }
+                Ok(())
+            }
+            _ => Err(Error::NoDetectedModules),
+        }?;
 
         let transmit_request = api::TransmitRequestFrame {
             dest_addr: m.device.addr_64bit,
