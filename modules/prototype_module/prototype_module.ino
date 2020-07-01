@@ -15,9 +15,14 @@
 
 RecieveFrame g_RxFrame;
 DHT dht(DHTPIN, DHTTYPE);
-
 struct ts rtc;
 ScheduleTime times[MAX_SCHEDULE_TIMES];
+
+unsigned long current_millis, start_millis, motor_start, motor_time, motor_duration, cooldown_start;
+bool motor_on = false;
+bool cooldown = false;
+char str[100];
+
 
 byte decToBcd(byte val) // Convert normal decimal numbers to binary coded decimal
 {
@@ -73,12 +78,8 @@ void refresh_schedule()
     // to test this now...
     for (int i = 0; i < MAX_SCHEDULE_TIMES; i++) {
         ScheduleTime t = times[i];
-        Serial.print(t.hour);
-        Serial.print(":");
-        Serial.print(t.min);
-        Serial.print(" MOTOR_TIME: ");
-        Serial.print(EEPROM.read(EEMEM_MOTOR_TIME_ADDR));
-        Serial.println();
+        sprintf(str, "%d:%d MOTOR_TIME: %d", t.hour, t.min, EEPROM.read(EEMEM_MOTOR_TIME_ADDR));
+        Serial.println(str);
     }
 }
 
@@ -389,9 +390,6 @@ void handle_packets()
     }
 }
 
-unsigned long current_millis, start_millis;
-unsigned long TIMER_START = 0;
-unsigned long INTERVAL = 1000 * 60 * 15;
 void setup()
 {
     uint8_t motor_time;
@@ -412,9 +410,6 @@ void setup()
     start_millis = millis();
 }
 
-bool motor_on = false;
-bool cooldown = false;
-unsigned long motor_start, motor_time, motor_duration, cooldown_start;
 void loop()
 {
 
@@ -458,7 +453,9 @@ void loop()
             if (t->hour == rtc.hour && t->min == rtc.min) {
                 // make sure we aren't in a cooldown period
                 if (!cooldown && !motor_on) {
+                    sprintf(str, "MOTOR ON (%d:%d)", rtc.hour, rtc.min);
                     // there is a match, turn it on and wait
+                    Serial.println(str);
                     motor_on = true;
                     motor_start = millis();
                     digitalWrite(RELAY_PIN, HIGH);
