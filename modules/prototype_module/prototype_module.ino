@@ -5,6 +5,9 @@
 #include <Wire.h> // Library  I2C
 #include <ds3231.h> // RTC
 #include <string.h>
+#include <SoftwareSerial.h>
+#include <SerLCD.h>
+
 
 #define DS3231_I2C_ADDRESS 0x68 // RTC Address
 #define DHTPIN 7 // Hum & Temp Pin (DHT Sensor)
@@ -17,7 +20,8 @@ RecieveFrame g_RxFrame;
 DHT dht(DHTPIN, DHTTYPE);
 struct ts rtc;
 ScheduleTime times[MAX_SCHEDULE_TIMES];
-
+SoftwareSerial lcd_serial(3,2);
+SerLCD lcd;
 unsigned long current_millis, start_millis, motor_start, motor_time, motor_duration, cooldown_start;
 bool motor_on = false;
 bool cooldown = false;
@@ -42,6 +46,17 @@ void reverse(uint8_t arr[], uint8_t n)
         arr[high] = temp;
     }
 }
+
+
+void lcd_status_report(){
+    char data[50];
+ 
+    lcd.setCursor(0,0);
+    
+    sprintf(data, "%02d/%02d/%04dT%02d:%02d:%02d", rtc.mon, rtc.mday, rtc.year, rtc.hour, rtc.min, rtc.sec);
+    lcd.print(data);
+}
+
 
 void refresh_schedule()
 {
@@ -223,6 +238,11 @@ void process_cmd(MasterRequest* request)
     // Set the amount of time motor is on
     else if (cmd == SetMotorTime) {
         uint8_t mt = request->args[0];
+        char data[50];
+        lcd.setCursor(3,1);
+        sprintf(data, "MOTOR_TIME: %03d", mt);
+        lcd.print(data);
+
         EEPROM.update(EEMEM_MOTOR_TIME_ADDR, mt);
 
         uint8_t to_send[] = { 0x00, 0x1a, 'O', 'K', '\r', '\n' };
@@ -405,6 +425,14 @@ void setup()
     while (!Serial)
         ;
 
+
+    lcd_serial.begin(9600);
+    lcd.begin(lcd_serial);
+    lcd.clear();
+    lcd.setCursor(0,1);
+    lcd.print("RX: ");
+    lcd.setCursor(0,2);
+    lcd.print("TX: ");
     refresh_schedule();
 
     start_millis = millis();
@@ -447,7 +475,7 @@ void loop()
         // refresh RTC and compare with schedule times - if there is a match,
         // turn on motor for N secs
         DS3231_get(&rtc);
-
+        
         for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES; i++) {
             ScheduleTime* t = &times[i];
             if (t->hour == rtc.hour && t->min == rtc.min) {
@@ -465,6 +493,7 @@ void loop()
             }
         }
 
+        lcd_status_report();
         start_millis = current_millis;
     }
 
