@@ -208,14 +208,13 @@ impl ModuleManager {
                 Ok(())
             }
             ModuleCommands::SetSchedule => {
-                // helelo
-                payload[3] = 9;
+                payload[3] = 0;
                 payload[4] = 00;
-                payload[5] = 12;
+                payload[5] = 3;
                 payload[6] = 00;
-                payload[7] = 15;
+                payload[7] = 6;
                 payload[8] = 00;
-                payload[9] = 18;
+                payload[9] = 9;
                 payload[10] = 00;
 
                 Ok(())
