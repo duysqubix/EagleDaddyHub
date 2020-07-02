@@ -203,7 +203,11 @@ void process_cmd(MasterRequest* request)
 {
     uint8_t cmd = request->cmd;
 
-    // Send back temperature and Humditity
+     char data[20];
+     lcd.setCursor(0,1);
+     sprintf(data, "RQST: 0x%02x", cmd);
+     lcd.print(data);
+        // Send back temperature and Humditity
     //
     // Response packet in the form of:
     // [mod_id, temp, hum]; where temp in C, hum = % both uint16_t
@@ -213,6 +217,7 @@ void process_cmd(MasterRequest* request)
 
         float temp, hum;
 
+       
         while (1) {
             temp = dht.readTemperature();
             hum = dht.readHumidity();
@@ -238,9 +243,9 @@ void process_cmd(MasterRequest* request)
     // Set the amount of time motor is on
     else if (cmd == SetMotorTime) {
         uint8_t mt = request->args[0];
-        char data[50];
-        lcd.setCursor(3,1);
-        sprintf(data, "MOTOR_TIME: %03d", mt);
+        char data[25];
+        lcd.setCursor(0,2);
+        sprintf(data, "MOTOR_TIME SET: %03d", mt);
         lcd.print(data);
 
         EEPROM.update(EEMEM_MOTOR_TIME_ADDR, mt);
@@ -283,6 +288,11 @@ void process_cmd(MasterRequest* request)
     //   u8   u8   u8    u8   u8    u16
     // Respond with "OK"
     else if (cmd == SetTime) {
+        char data[50];
+        lcd.setCursor(0,2);
+        sprintf(data, "SET TIME %d:%d:%d", rtc.hour, rtc.min, rtc.sec);
+        lcd.print(data);
+
         // the data should be contained within rf_data;
         rtc.sec = request->args[0];
         rtc.min = request->args[1];
