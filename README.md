@@ -6,7 +6,8 @@
 4) ~~Establish protocol between host xbee and remote xbees~~
 5) ~~Develop firmware for Remote XBee devices~~
 6) ~~Establish working full-duplex communication between host and remote devices~~
-7) Attach sensors to remote devices to test actual data communication
+7) ~~Attach sensors to remote devices to test actual data communication~~
+7.5) Create standalone box that holds a single module with LCD for debugging
 8) Test communication at a distance of remotes and master while using vanilla wire-antenna
 9) Research different types of antennas that will be best case for this project
 10) Find suitable places in Texas that will allow for different environment testing of devices
