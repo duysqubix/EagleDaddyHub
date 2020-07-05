@@ -208,14 +208,14 @@ impl ModuleManager {
                 Ok(())
             }
             ModuleCommands::SetSchedule => {
-                payload[3] = 0;
-                payload[4] = 00;
-                payload[5] = 3;
-                payload[6] = 00;
-                payload[7] = 6;
-                payload[8] = 00;
-                payload[9] = 9;
-                payload[10] = 00;
+                payload[3] = 21;
+                payload[4] = 43;
+                payload[5] = 21;
+                payload[6] = 44;
+                payload[7] = 21;
+                payload[8] = 45;
+                payload[9] = 21;
+                payload[10] = 46;
 
                 Ok(())
             }
@@ -318,6 +318,7 @@ impl ModuleManager {
                     .try_clone()
                     .expect("Could not clone serial"),
             );
+            // println!("{:?}", reply);
             match reply {
                 Ok(resp) => {
                     println!(
@@ -340,7 +341,10 @@ impl ModuleManager {
                         self.modules.push(module);
                     }
                 }
-                Err(_) => break,
+                Err(ref e) => {
+                    println!("Error: {:?}", e);
+                    break;
+                }
             }
         }
 

@@ -347,7 +347,7 @@ impl RecieveApiFrame for RecieveRequestFrame {
 
         ser.read_exact(&mut header)?;
         if header[0] != DELIM {
-            return Err(Error::FrameError("invalid frame".to_string()));
+            return Err(Error::FrameError(format!("invalid header start: {:x?}", header)));
         }
 
         let p_len = ((header[1] as u16) << 8) | (header[2] as u16);
