@@ -20,8 +20,6 @@ RecieveFrame g_RxFrame;
 DHT dht(DHTPIN, DHTTYPE);
 struct ts rtc;
 ScheduleTime times[MAX_SCHEDULE_TIMES];
-SoftwareSerial lcd_serial(3,2);
-SerLCD lcd;
 unsigned long current_millis, start_millis, motor_start, motor_time, motor_duration, cooldown_start;
 bool motor_on = false;
 bool cooldown = false;
@@ -45,16 +43,6 @@ void reverse(uint8_t arr[], uint8_t n)
         arr[low] = arr[high];
         arr[high] = temp;
     }
-}
-
-
-void lcd_status_report(){
-    char data[50];
- 
-    lcd.setCursor(0,0);
-    
-    sprintf(data, "%02d/%02d/%04dT%02d:%02d:%02d", rtc.mon, rtc.mday, rtc.year, rtc.hour, rtc.min, rtc.sec);
-    lcd.print(data);
 }
 
 
@@ -91,11 +79,11 @@ void refresh_schedule()
     }
 
     // to test this now...
-    for (int i = 0; i < MAX_SCHEDULE_TIMES; i++) {
-        ScheduleTime t = times[i];
-        sprintf(str, "%d:%d MOTOR_TIME: %d", t.hour, t.min, EEPROM.read(EEMEM_MOTOR_TIME_ADDR));
-        Serial.println(str);
-    }
+//    for (int i = 0; i < MAX_SCHEDULE_TIMES; i++) {
+//        ScheduleTime t = times[i];
+//        sprintf(str, "%d:%d MOTOR_TIME: %d", t.hour, t.min, EEPROM.read(EEMEM_MOTOR_TIME_ADDR));
+//        Serial.println(str);
+//    }
 }
 
 void parse_rx_packet()
@@ -203,11 +191,7 @@ void process_cmd(MasterRequest* request)
 {
     uint8_t cmd = request->cmd;
 
-     char data[20];
-     lcd.setCursor(0,1);
-     sprintf(data, "RQST: 0x%02x", cmd);
-     lcd.print(data);
-        // Send back temperature and Humditity
+    // Send back temperature and Humditity
     //
     // Response packet in the form of:
     // [mod_id, temp, hum]; where temp in C, hum = % both uint16_t
@@ -243,11 +227,6 @@ void process_cmd(MasterRequest* request)
     // Set the amount of time motor is on
     else if (cmd == SetMotorTime) {
         uint8_t mt = request->args[0];
-        char data[25];
-        lcd.setCursor(0,2);
-        sprintf(data, "MOTOR_TIME SET: %03d", mt);
-        lcd.print(data);
-
         EEPROM.update(EEMEM_MOTOR_TIME_ADDR, mt);
 
         uint8_t to_send[] = { 0x00, 0x1a, 'O', 'K', '\r', '\n' };
@@ -288,10 +267,6 @@ void process_cmd(MasterRequest* request)
     //   u8   u8   u8    u8   u8    u16
     // Respond with "OK"
     else if (cmd == SetTime) {
-        char data[50];
-        lcd.setCursor(0,2);
-        sprintf(data, "SET TIME %d:%d:%d", rtc.hour, rtc.min, rtc.sec);
-        lcd.print(data);
 
         // the data should be contained within rf_data;
         rtc.sec = request->args[0];
@@ -434,15 +409,6 @@ void setup()
     pinMode(RELAY_PIN, OUTPUT);
     while (!Serial)
         ;
-
-
-    lcd_serial.begin(9600);
-    lcd.begin(lcd_serial);
-    lcd.clear();
-    lcd.setCursor(0,1);
-    lcd.print("RX: ");
-    lcd.setCursor(0,2);
-    lcd.print("TX: ");
     refresh_schedule();
 
     start_millis = millis();
@@ -503,7 +469,6 @@ void loop()
             }
         }
 
-        lcd_status_report();
         start_millis = current_millis;
     }
 
