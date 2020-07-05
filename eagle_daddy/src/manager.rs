@@ -318,6 +318,7 @@ impl ModuleManager {
                     .try_clone()
                     .expect("Could not clone serial"),
             );
+            // println!("{:?}", reply);
             match reply {
                 Ok(resp) => {
                     println!(
@@ -340,7 +341,10 @@ impl ModuleManager {
                         self.modules.push(module);
                     }
                 }
-                Err(_) => break,
+                Err(ref e) => {
+                    println!("Error: {:?}", e);
+                    break;
+                }
             }
         }
 
