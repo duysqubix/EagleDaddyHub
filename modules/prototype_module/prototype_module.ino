@@ -109,13 +109,12 @@ void parse_rx_packet()
 
 void transmit_request(uint8_t* data, uint8_t len)
 {
-    // check to see if original master request was a broadcasted message, in
-    // that case, attach a slight delay to minimize signal colliding
-    if (g_RxFrame.recv_opts & 0x02)
-        delay(random(0, 2000));
-
     uint8_t packet_len = len + 18;
     uint8_t packet[packet_len];
+    
+    char str[100];
+    sprintf(str, "addr: %d, opts: %d, rf_data: %d", g_RxFrame.source_addr, g_RxFrame.recv_opts, g_RxFrame.rf_data);
+    Serial.println(str);
 
     packet[0] = 0x7e;
     packet[1] = ((packet_len - 4) >> 8) & 0xff;
@@ -376,7 +375,7 @@ void handle_packets()
             // to saturate RF bus with multiple data bits
             if (request.module_id == BroadcastId) {
                 uint8_t to_send[] = { 0x00, 0x1a };
-                delay(random(0, 2000)); // wait anywhere between 0ms and 2000ms
+                delay(random(0, 4000)); // wait anywhere between 0ms and 2000ms
                 transmit_request(to_send, sizeof(to_send));
                 break;
             }
