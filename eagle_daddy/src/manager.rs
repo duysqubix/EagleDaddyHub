@@ -2,7 +2,7 @@
 
 use crate::modules::{self, Module};
 use bytes::BytesMut;
-use chrono::{DateTime, Datelike, Local, TimeZone, Timelike};
+use chrono::{DateTime, Datelike, Local, Timelike};
 use rustbee::{
     api::{self, RecieveApiFrame},
     device::{self, DigiMeshDevice},
@@ -208,14 +208,14 @@ impl ModuleManager {
                 Ok(())
             }
             ModuleCommands::SetSchedule => {
-                payload[3] = 21;
-                payload[4] = 43;
-                payload[5] = 21;
-                payload[6] = 44;
-                payload[7] = 21;
+                payload[3] = 8;
+                payload[4] = 40;
+                payload[5] = 12;
+                payload[6] = 30;
+                payload[7] = 13;
                 payload[8] = 45;
-                payload[9] = 21;
-                payload[10] = 46;
+                payload[9] = 16;
+                payload[10] = 00;
 
                 Ok(())
             }
@@ -318,7 +318,6 @@ impl ModuleManager {
                     .try_clone()
                     .expect("Could not clone serial"),
             );
-            // println!("{:?}", reply);
             match reply {
                 Ok(resp) => {
                     println!(
@@ -341,10 +340,7 @@ impl ModuleManager {
                         self.modules.push(module);
                     }
                 }
-                Err(ref e) => {
-                    println!("Error: {:?}", e);
-                    break;
-                }
+                Err(_) => break,
             }
         }
 
