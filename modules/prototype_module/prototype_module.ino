@@ -5,8 +5,8 @@
 #include <Wire.h>   // Library  I2C
 #include <ds3231.h> // RTC
 #include <string.h>
-#include <SoftwareSerial.h>
-#include <SerLCD.h>
+//#include <SoftwareSerial.h>
+//#include <SerLCD.h>
 
 #define DS3231_I2C_ADDRESS 0x68 // RTC Address
 #define DHTPIN 7                // Hum & Temp Pin (DHT Sensor)
