@@ -308,8 +308,8 @@ impl ModuleManager {
             payload: b"\x0a\xaa",
         };
 
-        let _transmit_status = self.device.send_frame(broadcast_id)?;
-        //println!("{:#x?}", transmit_status);
+        let transmit_status = self.device.send_frame(broadcast_id)?;
+        println!("{:#x?}", transmit_status);
 
         loop {
             let reply = api::RecieveRequestFrame::recieve(
@@ -318,6 +318,9 @@ impl ModuleManager {
                     .try_clone()
                     .expect("Could not clone serial"),
             );
+
+            println!("{:#x?}", reply);
+
             match reply {
                 Ok(resp) => {
                     println!(

@@ -2,16 +2,15 @@
 #include <Arduino.h>
 #include <DHT.h> // Library Hum&Temp
 #include <EEPROM.h>
-#include <Wire.h> // Library  I2C
+#include <Wire.h>   // Library  I2C
 #include <ds3231.h> // RTC
 #include <string.h>
 #include <SoftwareSerial.h>
 #include <SerLCD.h>
 
-
 #define DS3231_I2C_ADDRESS 0x68 // RTC Address
-#define DHTPIN 7 // Hum & Temp Pin (DHT Sensor)
-#define DHTTYPE DHT11 // DHT 11  sensor
+#define DHTPIN 7                // Hum & Temp Pin (DHT Sensor)
+#define DHTTYPE DHT11           // DHT 11  sensor
 #define TRIG_PIN 9
 #define ECHO_PIN 10
 #define RELAY_PIN 11
@@ -25,7 +24,6 @@ bool motor_on = false;
 bool cooldown = false;
 char str[100];
 
-
 byte decToBcd(byte val) // Convert normal decimal numbers to binary coded decimal
 {
     return ((val / 10 * 16) + (val % 10));
@@ -38,13 +36,13 @@ byte bcdToDec(byte val) // Convert binary coded decimal to normal decimal number
 
 void reverse(uint8_t arr[], uint8_t n)
 {
-    for (uint8_t low = 0, high = n - 1; low < high; low++, high--) {
+    for (uint8_t low = 0, high = n - 1; low < high; low++, high--)
+    {
         uint8_t temp = arr[low];
         arr[low] = arr[high];
         arr[high] = temp;
     }
 }
-
 
 void refresh_schedule()
 {
@@ -54,36 +52,38 @@ void refresh_schedule()
     uint8_t values[MAX_SCHEDULE_TIMES * 2];
     uint8_t a, b;
 
-    for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES * 2; i++) {
+    for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES * 2; i++)
+    {
         values[i] = EEPROM.read(eeprom_addr++);
     }
 
-    for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES; i++) {
+    for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES; i++)
+    {
         a = (i * 2);
         b = (1 * 2) + 1;
         ScheduleTime t;
-        if (values[a] != 0xff) {
+        if (values[a] != 0xff)
+        {
             t = {
                 .hour = *(values + a),
-                .min = *(values + a + 1)
-            };
-
-        } else {
+                .min = *(values + a + 1)};
+        }
+        else
+        {
             t = {
                 .hour = 0xff,
-                .min = 0xff
-            };
+                .min = 0xff};
         }
 
         times[i] = t;
     }
 
     // to test this now...
-//    for (int i = 0; i < MAX_SCHEDULE_TIMES; i++) {
-//        ScheduleTime t = times[i];
-//        sprintf(str, "%d:%d MOTOR_TIME: %d", t.hour, t.min, EEPROM.read(EEMEM_MOTOR_TIME_ADDR));
-//        Serial.println(str);
-//    }
+    //    for (int i = 0; i < MAX_SCHEDULE_TIMES; i++) {
+    //        ScheduleTime t = times[i];
+    //        sprintf(str, "%d:%d MOTOR_TIME: %d", t.hour, t.min, EEPROM.read(EEMEM_MOTOR_TIME_ADDR));
+    //        Serial.println(str);
+    //    }
 }
 
 void parse_rx_packet()
@@ -91,15 +91,17 @@ void parse_rx_packet()
     uint8_t size = sizeof(uint64_t);
     uint8_t addr[size], data[size];
 
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < size; i++)
+    {
         addr[i] = RX_PACKET[i + 1]; // store address values of packet
     }
 
-    for (int i = 0; i < MAX_RF_DATA_LEN; i++) {
+    for (int i = 0; i < MAX_RF_DATA_LEN; i++)
+    {
         data[i] = RX_PACKET[i + 12]; // store actual rf data of packet
     }
 
-    reverse(addr, size); // reverse as AVR stores integers little-endian, and incoming data is big-endian
+    reverse(addr, size);                        // reverse as AVR stores integers little-endian, and incoming data is big-endian
     memcpy(&g_RxFrame.source_addr, addr, size); // store source addr to rx frame
 
     g_RxFrame.recv_opts = RX_PACKET[11]; // store recieve options
@@ -107,11 +109,11 @@ void parse_rx_packet()
     memcpy(&g_RxFrame.rf_data, data, MAX_RF_DATA_LEN); // copy rf data to
 }
 
-void transmit_request(uint8_t* data, uint8_t len)
+void transmit_request(uint8_t *data, uint8_t len)
 {
     uint8_t packet_len = len + 18;
     uint8_t packet[packet_len];
-    
+
     char str[100];
     sprintf(str, "addr: %d, opts: %d, rf_data: %d", g_RxFrame.source_addr, g_RxFrame.recv_opts, g_RxFrame.rf_data);
     Serial.println(str);
@@ -134,13 +136,15 @@ void transmit_request(uint8_t* data, uint8_t len)
     packet[15] = 0; // broadcast radius
     packet[16] = 0; // transmit options
 
-    for (uint8_t i = 0; i < len; i++) {
+    for (uint8_t i = 0; i < len; i++)
+    {
         packet[17 + i] = *data;
         data++;
     }
 
     uint8_t chksum = 0;
-    for (uint8_t i = 3; i < packet_len - 1; i++) {
+    for (uint8_t i = 3; i < packet_len - 1; i++)
+    {
         chksum = chksum + packet[i];
     }
 
@@ -154,18 +158,23 @@ void transmit_request(uint8_t* data, uint8_t len)
 
     uint8_t status[11];
     bool success = false;
-    while (tries < max_tries) {
-        for (uint8_t i = 0; i < sizeof(packet); i++) {
+    while (tries < max_tries)
+    {
+        for (uint8_t i = 0; i < sizeof(packet); i++)
+        {
             Serial.write(packet[i]);
         }
 
         Serial.flush();
 
-        if (!Serial.readBytes(status, sizeof(status))) {
+        if (!Serial.readBytes(status, sizeof(status)))
+        {
             // attempt gone wrong, retry
             tries++;
             continue;
-        } else {
+        }
+        else
+        {
             // success full we can do some extra checks here
             if (status[3] == 0x8b)
                 break; // looks like a successful transmit
@@ -175,7 +184,8 @@ void transmit_request(uint8_t* data, uint8_t len)
     }
 }
 
-enum Commands {
+enum Commands
+{
     RequestTime = 0x1d,
     RequestTH = 0x2b,
     RequestDist = 0x3c,
@@ -186,7 +196,7 @@ enum Commands {
     BroadcastId = 0x0aaa,
 };
 
-void process_cmd(MasterRequest* request)
+void process_cmd(MasterRequest *request)
 {
     uint8_t cmd = request->cmd;
 
@@ -194,26 +204,28 @@ void process_cmd(MasterRequest* request)
     //
     // Response packet in the form of:
     // [mod_id, temp, hum]; where temp in C, hum = % both uint16_t
-    if (cmd == RequestTH) {
+    if (cmd == RequestTH)
+    {
         //float temp = dht.readTemperature();
         //float hum = dht.readHumidity();
 
         float temp, hum;
 
-       
-        while (1) {
+        while (1)
+        {
             temp = dht.readTemperature();
             hum = dht.readHumidity();
 
-            if (isnan(temp) || isnan(hum)) {
+            if (isnan(temp) || isnan(hum))
+            {
                 continue;
             }
             break;
         }
 
         uint8_t *t, *h;
-        t = (uint8_t*)(&temp);
-        h = (uint8_t*)(&hum);
+        t = (uint8_t *)(&temp);
+        h = (uint8_t *)(&hum);
 
         uint8_t to_send[sizeof(float) * 2];
 
@@ -224,13 +236,13 @@ void process_cmd(MasterRequest* request)
     }
 
     // Set the amount of time motor is on
-    else if (cmd == SetMotorTime) {
+    else if (cmd == SetMotorTime)
+    {
         uint8_t mt = request->args[0];
         EEPROM.update(EEMEM_MOTOR_TIME_ADDR, mt);
 
-        uint8_t to_send[] = { 0x00, 0x1a, 'O', 'K', '\r', '\n' };
+        uint8_t to_send[] = {0x00, 0x1a, 'O', 'K', '\r', '\n'};
         transmit_request(to_send, sizeof(to_send));
-
     }
 
     // Overwrite schedule times for when to switch 'motor' on
@@ -238,14 +250,17 @@ void process_cmd(MasterRequest* request)
     // data expected in the following format:
     //
     // [uin16_t*4]// if 0xffff, then ignore
-    else if (cmd == SetSchedule) {
+    else if (cmd == SetSchedule)
+    {
         uint8_t eeprom_addr = EEMEM_MOTOR_SCH_ADDR;
         uint8_t times[MAX_SCHEDULE_TIMES * 2];
 
         memcpy(times, request->args, MAX_SCHEDULE_TIMES * 2);
 
-        for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES * 2; i++) {
-            if (request->args[i] != 0xff) {
+        for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES * 2; i++)
+        {
+            if (request->args[i] != 0xff)
+            {
 
                 EEPROM.update(eeprom_addr, request->args[i]);
             }
@@ -254,7 +269,7 @@ void process_cmd(MasterRequest* request)
 
         refresh_schedule();
 
-        uint8_t to_send[] = { 0x00, 0x1a, 'O', 'K', '\r', '\n' };
+        uint8_t to_send[] = {0x00, 0x1a, 'O', 'K', '\r', '\n'};
         transmit_request(to_send, sizeof(to_send));
     }
 
@@ -265,7 +280,8 @@ void process_cmd(MasterRequest* request)
     // [sec, min, hour, day, month, year]
     //   u8   u8   u8    u8   u8    u16
     // Respond with "OK"
-    else if (cmd == SetTime) {
+    else if (cmd == SetTime)
+    {
 
         // the data should be contained within rf_data;
         rtc.sec = request->args[0];
@@ -277,7 +293,7 @@ void process_cmd(MasterRequest* request)
 
         DS3231_set(rtc);
 
-        uint8_t to_send[] = { 0x00, 0x1a, 'O', 'K', '\r', '\n' };
+        uint8_t to_send[] = {0x00, 0x1a, 'O', 'K', '\r', '\n'};
         transmit_request(to_send, sizeof(to_send));
     }
 
@@ -285,7 +301,8 @@ void process_cmd(MasterRequest* request)
     //
     // Response:
     // [mod_id, u64 value that contains time]
-    else if (cmd == RequestTime) {
+    else if (cmd == RequestTime)
+    {
         uint8_t time[9];
 
         //    Wire.beginTransmission(DS3231_I2C_ADDRESS);
@@ -318,10 +335,11 @@ void process_cmd(MasterRequest* request)
     //
     // Response:
     // [mod_id, time(s)]
-    else if (cmd == RequestMotor) {
+    else if (cmd == RequestMotor)
+    {
         digitalWrite(RELAY_PIN, !digitalRead(RELAY_PIN));
 
-        uint8_t to_send[] = { 0x00, 0x1a, '0', 'K', '\r', '\n' };
+        uint8_t to_send[] = {0x00, 0x1a, '0', 'K', '\r', '\n'};
         transmit_request(to_send, sizeof(to_send));
     }
 
@@ -329,7 +347,8 @@ void process_cmd(MasterRequest* request)
     //
     //Repsonse:
     // [mod_id, distance(cm)]
-    else if (cmd == RequestDist) {
+    else if (cmd == RequestDist)
+    {
         float cm, duration;
         digitalWrite(TRIG_PIN, LOW);
         delayMicroseconds(5);
@@ -349,8 +368,10 @@ void process_cmd(MasterRequest* request)
         to_send[1] = 0x1a;
         memcpy(to_send + 2, &cm, sizeof(float));
         transmit_request(to_send, sizeof(to_send));
-    } else {
-        uint8_t to_send[5] = { 0x00, 0x1a, 0xff, 0x2 }; // unknown command
+    }
+    else
+    {
+        uint8_t to_send[5] = {0x00, 0x1a, 0xff, 0x2}; // unknown command
         to_send[4] = cmd;
         transmit_request(to_send, sizeof(to_send));
     }
@@ -358,7 +379,8 @@ void process_cmd(MasterRequest* request)
 
 void handle_packets()
 {
-    switch (RX_PACKET[0]) {
+    switch (RX_PACKET[0])
+    {
     case 0x90:
         MasterRequest request;
         parse_rx_packet(); // populates g_RxFrame
@@ -367,21 +389,23 @@ void handle_packets()
         memcpy(&request, &g_RxFrame.rf_data, MAX_RF_DATA_LEN);
         request.module_id = (g_RxFrame.rf_data[0] << 8) | g_RxFrame.rf_data[1];
 
-        if (request.module_id != MOD_ID) {
+        if (request.module_id != MOD_ID)
+        {
             // first check to see if it isn't broadcast request
             // check for broadcast
             // Internal Broadcast command - sends back its module_id. Must use a random number
             // as this cmd is intended to be used when host uses 'broadcast' mode, we don't want
             // to saturate RF bus with multiple data bits
-            if (request.module_id == BroadcastId) {
-                uint8_t to_send[] = { 0x00, 0x1a };
+            if (request.module_id == BroadcastId)
+            {
+                uint8_t to_send[] = {0x00, 0x1a};
                 delay(random(0, 4000)); // wait anywhere between 0ms and 2000ms
                 transmit_request(to_send, sizeof(to_send));
                 break;
             }
 
             // no? okay, then error out
-            uint8_t err[] = { 0x00, 0x1a, 0xff, 0x01 }; // Error, Wrong Module ID
+            uint8_t err[] = {0x00, 0x1a, 0xff, 0x01}; // Error, Wrong Module ID
             transmit_request(err, 4);
             break;
         }
@@ -427,52 +451,54 @@ void loop()
     //    TIMER_START current;
     //}
 
-    if (motor_on) {
-        motor_time = millis();
-        if ((motor_time - motor_start) >= motor_duration) {
-            motor_on = false;
-            digitalWrite(RELAY_PIN, LOW);
-            cooldown = true;
-            cooldown_start = millis();
-            Serial.println("MOTOR OFF");
-        }
-    }
+    // if (motor_on) {
+    //     motor_time = millis();
+    //     if ((motor_time - motor_start) >= motor_duration) {
+    //         motor_on = false;
+    //         digitalWrite(RELAY_PIN, LOW);
+    //         cooldown = true;
+    //         cooldown_start = millis();
+    //         Serial.println("MOTOR OFF");
+    //     }
+    // }
 
-    current_millis = millis();
+    // current_millis = millis();
 
-    if (cooldown) {
-        if ((current_millis - cooldown_start) >= 60000) {
-            cooldown = false;
-        }
-    }
+    // if (cooldown) {
+    //     if ((current_millis - cooldown_start) >= 60000) {
+    //         cooldown = false;
+    //     }
+    // }
 
-    if ((current_millis - start_millis) >= 1000) {
-        // refresh RTC and compare with schedule times - if there is a match,
-        // turn on motor for N secs
-        DS3231_get(&rtc);
-        
-        for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES; i++) {
-            ScheduleTime* t = &times[i];
-            if (t->hour == rtc.hour && t->min == rtc.min) {
-                // make sure we aren't in a cooldown period
-                if (!cooldown && !motor_on) {
-                    sprintf(str, "MOTOR ON (%d:%d)", rtc.hour, rtc.min);
-                    // there is a match, turn it on and wait
-                    Serial.println(str);
-                    motor_on = true;
-                    motor_start = millis();
-                    digitalWrite(RELAY_PIN, HIGH);
-                    motor_duration = EEPROM.read(EEMEM_MOTOR_TIME_ADDR) * 1000;
-                    break;
-                }
-            }
-        }
+    // if ((current_millis - start_millis) >= 1000) {
+    //     // refresh RTC and compare with schedule times - if there is a match,
+    //     // turn on motor for N secs
+    //     DS3231_get(&rtc);
 
-        start_millis = current_millis;
-    }
+    //     for (uint8_t i = 0; i < MAX_SCHEDULE_TIMES; i++) {
+    //         ScheduleTime* t = &times[i];
+    //         if (t->hour == rtc.hour && t->min == rtc.min) {
+    //             // make sure we aren't in a cooldown period
+    //             if (!cooldown && !motor_on) {
+    //                 sprintf(str, "MOTOR ON (%d:%d)", rtc.hour, rtc.min);
+    //                 // there is a match, turn it on and wait
+    //                 Serial.println(str);
+    //                 motor_on = true;
+    //                 motor_start = millis();
+    //                 digitalWrite(RELAY_PIN, HIGH);
+    //                 motor_duration = EEPROM.read(EEMEM_MOTOR_TIME_ADDR) * 1000;
+    //                 break;
+    //             }
+    //         }
+    //     }
 
-    if (Serial.available() > 0) {
-        for (;;) {
+    //     start_millis = current_millis;
+    // }
+
+    if (Serial.available() > 0)
+    {
+        for (;;)
+        {
             RX_BUF = Serial.read();
             if (RX_BUF == 0x7e)
                 break;
