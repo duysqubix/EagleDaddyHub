@@ -1,2 +1,5 @@
 target
 eagle_daddy/.modules
+*.pyc
+*.egg-info
+pydaddy/db.db3

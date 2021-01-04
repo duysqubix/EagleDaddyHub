@@ -1,0 +1,4 @@
+port: "COM4"    
+baud: 9600
+cluster_id: 123
+profile_id: 456
