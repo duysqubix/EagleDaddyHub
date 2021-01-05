@@ -1,16 +1,34 @@
 import argparse
 from serial.tools import list_ports
-from digi.xbee.devices import DigiMeshDevice
+from tabulate import tabulate
 
+from digi.xbee.devices import DigiMeshDevice
+from pydaddy.db.models import RemoteModule
 from pydaddy.hub import HubModule
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--discover-network",
+parser.add_argument("-d",
+                    "--discover-network",
                     help="Discovers newly found network",
-                    action='store_false')
+                    action='store_true')
+
+parser.add_argument("-l",
+                    "--list",
+                    help="Shows stored modules",
+                    action='store_true')
 
 if __name__ == '__main__':
     args = parser.parse_args()
     hub = HubModule()
     if args.discover_network:
-        hub.discover_new_devices()
+        hub.discover_all_devices()
+
+    elif args.list:
+        print('list')
+        devices = [(x.node_id, x.address64.hex(), x.network_id.hex(),
+                    x.parent_device.hex())
+                   for x in hub.db.query(RemoteModule).all()]
+        print(
+            tabulate(devices,
+                     headers=['Node ID', "MAC", "Network ID", "Hub MAC"],
+                     tablefmt="fancy_grid"))

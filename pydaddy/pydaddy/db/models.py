@@ -15,7 +15,7 @@ class RemoteModule(Model):
     node_id = Column(String(64), nullable=False)
     operating_mode = Column(Binary, nullable=False)
     network_id = Column(Binary, nullable=False)
-    main_hub = Column(Boolean, default=False)
+    parent_device = Column(Binary, nullable=False)
 
 
 Model.metadata.create_all(engine)
