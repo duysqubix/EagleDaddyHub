@@ -40,13 +40,6 @@ def get_package_data():
                 continue
             file_name = os.path.relpath(os.path.join(root, f), 'pydaddy')
             file_set.append(file_name)
-
-    for root, dirs, files in os.walk("bin"):
-        for f in files:
-            if ".git" in f.split(os.path.normpath(os.path.join(root, f))):
-                continue
-            file_name = os.path.relpath(os.path.join(root, f), 'pydaddy')
-            file_set.append(file_name)
     return file_set
 
 

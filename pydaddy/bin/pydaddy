@@ -1,0 +1,16 @@
+import argparse
+from serial.tools import list_ports
+from digi.xbee.devices import DigiMeshDevice
+
+from pydaddy.hub import HubModule
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--discover-network",
+                    help="Discovers newly found network",
+                    action='store_false')
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    hub = HubModule()
+    if args.discover_network:
+        hub.discover_new_devices()

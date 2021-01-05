@@ -8,6 +8,6 @@ __db_path = str((Path(__file__).parent.parent / "../db.db3").absolute())
 Model = declarative_base()
 engine = create_engine(f"sqlite:///{__db_path}")
 
-db = sessionmaker(bind=engine)()
-config = yaml.load(open(Path(__file__).parent.parent / "../config.yaml"),
+DB = sessionmaker(bind=engine)()
+CONFIG = yaml.load(open(Path(__file__).parent.parent / "../config.yaml"),
                    Loader=yaml.Loader)

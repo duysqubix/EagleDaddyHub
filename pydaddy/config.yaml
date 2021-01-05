@@ -1,4 +1,2 @@
-port: "COM4"    
+port: "/dev/ttyUSB0"    
 baud: 9600
-cluster_id: 123
-profile_id: 456

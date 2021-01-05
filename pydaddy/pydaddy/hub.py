@@ -2,9 +2,9 @@ from typing import *
 import yaml
 from pathlib import Path
 
-from digi.xbee.devices import DigiMeshDevice
+from digi.xbee.devices import DigiMeshDevice, XBeeNetwork
 
-from pydaddy import BROADCAST_ADDR
+from pydaddy.db import DB, CONFIG
 
 
 class HubModule:
@@ -21,9 +21,14 @@ class HubModule:
         return cls.__instance
 
     def __init__(self) -> None:
-        baud: int = self.config['baud']
-        port: str = self.config['port']
+        global DB, CONFIG
+
+        baud: int = CONFIG['baud']
+        port: str = CONFIG['port']
         self.hub: DigiMeshDevice = DigiMeshDevice(port=port, baud_rate=baud)
+        self.xnet: XBeeNetwork = self.hub.get_network()
+        self.db = DB
+        self.config = CONFIG
 
     def open(self):
         self.hub.open()
@@ -31,5 +36,5 @@ class HubModule:
     def close(self):
         self.hub.close()
 
-    def discover(self):
-        payload = b"\x0a\xaa"
+    def discover_all_devices(self, *args, **kwargs):
+        self.xnet.start_discovery_process(**kwargs)
