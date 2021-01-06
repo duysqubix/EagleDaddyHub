@@ -1,0 +1,1 @@
+REMOTE_CMD_RQST_PING = b"\x1d"

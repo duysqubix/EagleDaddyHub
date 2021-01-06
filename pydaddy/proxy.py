@@ -1,6 +1,7 @@
 """
 
 """
+import pickle
 from django.db.models import Model
 from pydaddy.models import RemoteModule
 from digi.xbee.devices import RemoteDigiMeshDevice
@@ -33,7 +34,3 @@ class ProxyDigiMeshDevice(_Proxy):
                       parent_device=self.parent.get_64bit_addr().address)
 
         return self.model(**params)
-
-    @classmethod
-    def from_record(cls, record):
-        pass
