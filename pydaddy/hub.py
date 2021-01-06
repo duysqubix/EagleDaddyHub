@@ -18,6 +18,7 @@ from pydaddy.proxy import ProxyDigiMeshDevice
 from pydaddy.models import RemoteModule
 from pydaddy.utils import make_iter
 from pydaddy.errors import ModuleNotFoundError
+from pydaddy.comms import ResponseMessage, _ModuleCmds
 
 
 class HubNet(DigiMeshNetwork):
@@ -27,12 +28,6 @@ class HubNet(DigiMeshNetwork):
     def add_remotes(self, remotes):
         remotes = make_iter(remotes)
         super().add_remotes(remotes)
-
-    def get_id(self, node_id) -> Union[RemoteDigiMeshDevice, None]:
-        for module in self.modules:
-            if module.get_node_id() == node_id:
-                return module
-        return None
 
     @property
     def modules(self):
@@ -47,6 +42,16 @@ class RemoteModuleDevice(RemoteDigiMeshDevice):
     @property
     def address(self):
         return self.get_64bit_addr().address
+
+    @property
+    def node_id(self):
+        return self.get_node_id()
+
+    def __repr__(self) -> str:
+        return f"<MODULE: {self.node_id}>"
+
+    def __str__(self):
+        return f"<MODULE: {self.address.hex()}"
 
 
 class HubModule(DigiMeshDevice):
@@ -64,6 +69,8 @@ class HubModule(DigiMeshDevice):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(port="COM4", baud_rate=9600, *args, **kwargs)
+        if self.is_open():
+            self.close()
         self.open()
 
         # add stored remote modules to internal network
@@ -86,21 +93,22 @@ class HubModule(DigiMeshDevice):
         return self.get_network()
 
     def check_remote_connectivity(self):
-        results = dict()
+        results = []
         for remote in self.net.modules:
             try:
                 status, resp = self.send_data_to_module(
-                    remote.get_node_id(), comms.REMOTE_CMD_RQST_PING)
+                    remote, _ModuleCmds.RQST_PING)
 
-                results[remote.address.hex()] = True
+                results.append((remote, True))
             except TransmitException:
-                results[remote.address.hex()] = False
+                results.append((remote, False))
         return results
 
     def discover_all_devices(self):
         self.net.start_discovery_process()
         count = 0
         init_scan = True
+        print("Scanning..")
         while self.net.is_discovery_running():
             num_devices = len(self.net.modules)
             if num_devices > count:
@@ -110,15 +118,12 @@ class HubModule(DigiMeshDevice):
                 try:
                     record = RemoteModule.objects.get(
                         address64=found_device_addr)
-                    in_db = colorama.Fore.GREEN + u"\N{check mark}" + f": {record.address64.hex()[-4:]}" + colorama.Fore.RESET
+                    in_db = colorama.Fore.GREEN + u"\N{check mark}" + f": {record.node_id}, {record.address64.hex()[-4:]}" + colorama.Fore.RESET
 
                 except RemoteModule.DoesNotExist:
-                    in_db = colorama.Fore.RED + u"\N{ballot x}" + f": {found_device_addr.hex()[-4:]}" + colorama.Fore.RESET
+                    in_db = colorama.Fore.RED + u"\N{ballot x}" + f": {found_device.node_id}, {found_device_addr.hex()[-4:]}" + colorama.Fore.RESET
                 print(f"Found: {len(self.net.modules)} device(s) ({in_db})")
                 count = num_devices
-            elif count == 0 and init_scan:
-                print("Scanning..")
-                init_scan = False
 
         print(f"Finished. Found {len(self.net.modules)} device(s).")
 
@@ -131,16 +136,20 @@ class HubModule(DigiMeshDevice):
                 # add it
                 new_record = ProxyDigiMeshDevice(device).to_model()
                 new_record.save()
-        self.close()
 
-    def send_data_to_module(self, node_id,
-                            data) -> Tuple[TransmitStatus, XBeeMessage]:
-        remote_device = self.net.get_id(node_id)
+    def send_data_to_module(self, remote: Union[RemoteModuleDevice, str],
+                            data: bytes) -> Tuple[TransmitStatus, XBeeMessage]:
+        if isinstance(remote, str):
+            remote_device = self.net.get_device_by_node_id(remote)
+
+        elif isinstance(remote, RemoteModuleDevice):
+            remote_device = remote
+
         if not remote_device:
             raise ModuleNotFoundError(
                 "no matching remote device with node_id.")
 
         transmit_status: TransmitStatus = self.send_data(remote_device, data)
-        response: XBeeMessage = self.read_data(1)
+        response: ResponseMessage = ResponseMessage(self.read_data(1))
 
         return (transmit_status, response)
