@@ -1,9 +1,9 @@
 """
 
 """
-from pydaddy.db.models import RemoteModule
+from django.db.models import Model
+from pydaddy.models import RemoteModule
 from digi.xbee.devices import RemoteDigiMeshDevice
-from pydaddy.db import Model
 
 
 class _Proxy:

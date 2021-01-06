@@ -1,13 +1,13 @@
-from pydaddy.db.models import RemoteModule
 from typing import *
-import yaml
 import time
 from pathlib import Path
 
 from digi.xbee.devices import DigiMeshDevice, RemoteDigiMeshDevice, XBeeNetwork
+from django.db import models
 
-from pydaddy.db import DB, CONFIG
-from pydaddy.db.proxy import ProxyDigiMeshDevice
+from django.db.models import Model
+from pydaddy.proxy import ProxyDigiMeshDevice
+from pydaddy.models import RemoteModule
 
 
 class HubModule:
@@ -24,14 +24,10 @@ class HubModule:
         return cls.__instance
 
     def __init__(self) -> None:
-        global DB, CONFIG
 
-        baud: int = CONFIG['baud']
-        port: str = CONFIG['port']
-        self.device: DigiMeshDevice = DigiMeshDevice(port=port, baud_rate=baud)
+        self.device: DigiMeshDevice = DigiMeshDevice(port="COM4",
+                                                     baud_rate=9600)
         self.xnet: XBeeNetwork = self.device.get_network()
-        self.db = DB
-        self.config = CONFIG
 
     def open(self):
         self.device.open()
@@ -43,26 +39,27 @@ class HubModule:
         self.open()
         self.xnet.start_discovery_process()
         count = 0
+        init_scan = True
         while self.xnet.is_discovery_running():
             num_devices = len(self.xnet.get_devices())
             if num_devices > count:
                 print(f"Found: {len(self.xnet.get_devices())} device(s)")
                 count = num_devices
-            elif count == 0:
+            elif count == 0 and init_scan:
                 print("Scanning..")
-            time.sleep(3)
+                init_scan = False
 
         print(f"Finished. Found {len(self.xnet.get_devices())} device(s).")
 
         for device in self.xnet.get_devices():
-            record = self.db.query(RemoteModule).filter(
-                RemoteModule.address64 ==
-                device.get_64bit_addr().address).first()
+            device_addr = device.get_64bit_addr().address
 
-            if not record:
+            try:
+                record = RemoteModule.objects.get(address64=device_addr)
+            except RemoteModule.DoesNotExist:
                 # add it
                 new_record = ProxyDigiMeshDevice(device).to_model()
-                self.db.add(new_record)
-                self.db.commit()
+                new_record.save()
+
         self.close()
         # add to database

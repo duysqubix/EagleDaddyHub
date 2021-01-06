@@ -3,3 +3,6 @@ eagle_daddy/.modules
 *.pyc
 *.egg-info
 pydaddy/db.db3
+db.sqlite3
+migrations
+

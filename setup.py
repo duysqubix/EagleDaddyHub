@@ -2,7 +2,7 @@ import os
 from setuptools import setup, find_packages
 from pathlib import Path
 
-VERSION_PATH = Path(__file__).parent / "pydaddy/VERSION.txt"
+VERSION_PATH = Path(__file__).parent / "eagledaddy/VERSION.txt"
 
 
 def get_version():
@@ -34,16 +34,16 @@ def get_scripts():
 
 def get_package_data():
     file_set = []
-    for root, dirs, files in os.walk("pydaddy"):
+    for root, dirs, files in os.walk("eagledaddy"):
         for f in files:
             if ".git" in f.split(os.path.normpath(os.path.join(root, f))):
                 continue
-            file_name = os.path.relpath(os.path.join(root, f), 'pydaddy')
+            file_name = os.path.relpath(os.path.join(root, f), 'eagledaddy')
             file_set.append(file_name)
     return file_set
 
 
-setup(name="pydaddy",
+setup(name="eagledaddy",
       author="duan uys",
       version=get_version(),
       maintainer="duan uys",
