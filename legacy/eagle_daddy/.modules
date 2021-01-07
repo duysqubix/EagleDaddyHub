@@ -1,7 +1,0 @@
----
-- id: 26
-  device:
-    addr_64bit: 5526146544118394
-    node_id: SLAVE2
-    firmware_version: 32885
-    hardware_version: 9035
