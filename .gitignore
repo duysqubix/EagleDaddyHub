@@ -5,4 +5,7 @@ eagle_daddy/.modules
 pydaddy/db.db3
 db.sqlite3
 migrations
-
+htmlconv/*
+.coverage
+*.ipynb
+.ipynb_checkpoints/*
