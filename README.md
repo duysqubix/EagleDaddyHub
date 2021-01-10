@@ -1,2 +1,7 @@
-Repo that contains the scripts and resources needed to install a fresh EagleDaddy Core Hub.
+Set of scripts and necessary files to automate the process
+of flashing a brand new OS to sdcard and putting necessary files
+into proper location to ensure correct setup when powered on for the first
+time.
+
+
 
