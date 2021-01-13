@@ -108,7 +108,6 @@ if ! command -v etcher &> /dev/null
 then
     write "etcher-cli is not installed\nattempting automatic install..." 0
     install_etcher_cli
-    exit -1
 fi
 
 # check to see if host can detect SD Card

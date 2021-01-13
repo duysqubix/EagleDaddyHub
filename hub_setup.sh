@@ -104,7 +104,12 @@ apt update
 apt install -y libffi-dev libssl-dev python3-dev python3 python3-pip hostapd dnsmasq ufw
 
 # install docker
-curl https://get.docker.com | sh 
+if ! command -v docker &> /dev/null
+then
+    write 'docker not detected, installing it now...'
+    curl https://get.docker.com | sh
+fi
+ 
 
 # install docker-compose
 pip3 install docker-compose
@@ -139,7 +144,7 @@ cp .env $EG_DIR
 chown -R $USER $EG_DIR
 
 # build and run docker as eagledaddy user
-docker-compose -f $EG_DIR/docker-compose.yml --project-name eagledaddy_hub up --build --detach
+docker-compose -f $EG_DIR/docker-compose.yml --project-name eagledaddy_hub up --detach
 exit 0
 
 
