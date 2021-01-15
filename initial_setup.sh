@@ -140,6 +140,7 @@ fi
 write "`mount -v $BOOT $BOOT_MNT`"
 write "`mount -v $ROOT $ROOT_MNT`"
 
+# download docker-compose.yml from git
 
 
 #### COPY OVER TO BOOT ######################
@@ -158,10 +159,10 @@ write "enabling ssh: `cp -v ssh $BOOT_MNT/`"
 #### COPY OVER TO ROOT ######################
 write "enabling static IP, $STATIC_IP,  `cp -v dhcpcd.conf $ROOT_MNT/etc/`"
 write "transfering setup script `cp -v hub_setup.sh $ROOT_MNT/home/`"
+write "copying docker file `cp -v docker-compose.yml $ROOT_MNT/home/`"
 
-
-write "obtaining src code `get_eagledaddy_git`"
-write "transfering src code `cp -v eagledaddy.tar.gz $ROOT_MNT/home/ && cp -v .env $ROOT_MNT/home/`"
+# write "obtaining src code `get_eagledaddy_git`"
+# write "transfering src code `cp -v eagledaddy.tar.gz $ROOT_MNT/home/ && cp -v .env $ROOT_MNT/home/`"
 
 # cleanup things
 cleanup

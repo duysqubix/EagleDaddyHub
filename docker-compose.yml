@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  eagledaddy:
+    container_name: eagledaddy
+    
+    # connects to cloud repo
+    image: eagledaddy/eagledaddy:latest
+    build: .
+
+    # connects serial devices to container
+    volumes:
+      - '/dev:/dev'
+    
+    # make container network same as host
+    # needed for iwlist to work
+    network_mode: 'host'
+
+    # to access serial devices, container must run with privlege
+    privileged: true
+    stdin_open: true
+    tty: true
+    restart: on-failure

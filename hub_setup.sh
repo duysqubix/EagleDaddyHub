@@ -120,16 +120,17 @@ iptables -A INPUT -p tcp --dport 80 --jump ACCEPT # to manually open web port
 iptables-save
 write "initializing ports... `sleep 5`" # wait for ufw to take affect
 
-# copy over eagledaddysrc code to WORKDIR
-mkdir -p $EG_DIR
-mkdir -p $EG_TMP
-tar -xzvf eagledaddy.tar.gz -C / # moves to /tmp folder
-mv $EG_TMP/* $EG_DIR
-chown -R $USER $EG_DIR
+# # copy over eagledaddysrc code to WORKDIR
+# mkdir -p $EG_DIR
+# mkdir -p $EG_TMP
+# tar -xzvf eagledaddy.tar.gz -C / # moves to /tmp folder
+# mv $EG_TMP/* $EG_DIR
+# chown -R $USER $EG_DIR
 
 # build and run docker as eagledaddy user
-docker-compose -f $EG_DIR/docker-compose.yml --project-name eagledaddy_hub build
-reboot now
+# docker-compose -f $EG_DIR/docker-compose.yml --project-name eagledaddy_hub build
+docker-compose pull && docker-compose up -d
+# reboot now
 exit 0
 
 
