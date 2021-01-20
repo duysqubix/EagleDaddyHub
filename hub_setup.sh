@@ -22,56 +22,66 @@ write(){
 
 
 init_ap(){
-    apt install -y hostapd dnsmasq 
-    # DEBIAN_FRONTEND=noninteractive apt install -y netfilter-persistent iptables-persistent
+    
+    apt --autoremove purge -y ifupdown dhcpcd5 isc-dhcp-client isc-dhcp-common rsyslog
+    apt-mark hold ifupdown dhcpcd5 isc-dhcp-client isc-dhcp-common rsyslog raspberrypi-net-mods openresolv
+    rm -r /etc/network /etc/dhcp
 
-    systemctl unmask hostapd.service
-    systemctl enable hostapd.service
-    #### configure hostapd
+    apt --autoremove purge -y avahi-daemon
+    apt-mark hold avahi-daemon libnss-mdns
+    apt install -y libnss-resolve
+    ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+    systemctl enable systemd-networkd.service systemd-resolved.service
 
-    # tell dhcp to set static ip address
-        cat << EOF >> /etc/dhcpcd.conf
-interface wlan0
-    static ip_address=192.168.4.1/24
-    nohook wpa_supplicant
+    # configure wlan0
+    cat > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf <<EOF
+country=US
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="EagleDaddyHub"
+    mode=2
+    key_mgmt=WPA-PSK
+    psk="eagledaddy"
+    frequency=2412
+}
+EOF
+    chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+    systemctl disable wpa_supplicant.service
+    systemctl enable wpa_supplicant@wlan0.service
+    rfkill unblock 0
+
+
+    # configure wlan1
+
+    # rename wpa_supplicant.conf to wpa_supplicant-wlan1.conf
+    mv /etc/wpa_supplicant/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
+    chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
+    systemctl disable wpa_supplicant.service
+    systemctl enable wpa_supplicant@wlan1.service
+    rfkill unblock 2
+
+    #configure interfaces
+    cat > /etc/systemd/network/08-wlan0.network <<EOF
+[Match]
+Name=wlan0
+[Network]
+Address=192.168.4.1/24
+# IPMasquerade is doing NAT
+IPMasquerade=yes
+IPForward=yes
+DHCPServer=yes
+[DHCPServer]
+DNS=84.200.69.80 1.1.1.1
 EOF
 
-    #### configure dnsmasq
-    write "configuring dns server"
-    mv /etc/dnsmasq.conf /etc/dnsmasq.conf.bak
-
-    # 
-    cat << EOF >> /etc/dnsmasq.conf
-interface=wlan0
-dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
-domain=eagledaddy
-address=/hub.eagledaddy/192.168.4.1
+    cat > /etc/systemd/network/12-wlan1.network <<EOF
+[Match]
+Name=wlan1
+[Network]
+DHCP=yes
 EOF
-    # enable 5Ghz
-    write "enabling 5Ghz"
-    rfkill unblock wlan
-
-    # configure hostapd.conf
-    cat << EOF >> /etc/hostapd/hostapd.conf
-country_code=US
-interface=wlan0
-ssid=EagleDaddyHub
-hw_mode=g
-channel=7
-auth_algs=1
-macaddr_acl=0
-ignore_broadcast_ssid=0
-wpa=2
-wpa_key_mgmt=WPA-PSK
-wpa_passphrase=eagledaddy
-wpa_pairwise=TKIP
-rsn_pairwise=CCMP
-EOF
-
-    # updated DAEMON_CONF in default hostapd so it knows where to find
-    # configuration files
-    sed -i "/DAEMON_CONF=/c\DAEMON_CONF=\"/etc/hostapd/hostapd.conf\"" /etc/default/hostapd
-
 }
 
 
@@ -130,6 +140,16 @@ write "initializing ports... `sleep 5`" # wait for ufw to take affect
 # build and run docker as eagledaddy user
 # docker-compose -f $EG_DIR/docker-compose.yml --project-name eagledaddy_hub build
 docker-compose pull && docker-compose up -d
+
+
+# activate shutdown_signal script as service
+chmod +x wait_for_shutdown_signal.sh
+cp shutdown_signal_eagledaddy.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable shutdown_signal_eagledaddy.service
+systemctl start shutdown_signal_eagledaddy.service
+systemctl status shutdown_signal_eagledaddy.service
+write "Please reboot for changes to take effect"
 # reboot now
 exit 0
 

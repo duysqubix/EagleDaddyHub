@@ -1,0 +1,13 @@
+[Unit]
+Description=Shuts down host from docker container when 'true' is written to a file called shutdown_signal
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/wait_for_shutdown_signal.sh
+Restart=on-failure
+RestartSec=10
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

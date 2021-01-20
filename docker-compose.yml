@@ -6,11 +6,14 @@ services:
     
     # connects to cloud repo
     image: eagledaddy/eagledaddy:latest
-    build: .
 
     # connects serial devices to container
     volumes:
       - '/dev:/dev'
+      - '/tmp:/tmp'
+      - '/etc/wpa_supplicant:/etc/wpa_supplicant'
+    
+    pid: 'host'
     
     # make container network same as host
     # needed for iwlist to work
