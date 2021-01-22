@@ -141,6 +141,11 @@ write "initializing ports... `sleep 5`" # wait for ufw to take affect
 # docker-compose -f $EG_DIR/docker-compose.yml --project-name eagledaddy_hub build
 docker-compose pull && docker-compose up -d
 
+# copy over prod config.yml to docker
+docker cp config.yml eagledaddy:/home/config.yml
+
+# settings for production:
+docker exec eagledaddy cat config.yml
 
 # activate shutdown_signal script as service
 chmod +x wait_for_shutdown_signal.sh
