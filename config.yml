@@ -1,0 +1,1 @@
+shutdown_daemon: true  # make sure this is true for production
