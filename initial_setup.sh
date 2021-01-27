@@ -12,7 +12,7 @@ export BOOT=/dev/sda1
 export ROOT=/dev/sda2
 export ROOT_MNT=/mnt/root
 export BOOT_MNT=/mnt/boot 
-export OS_IMG_FILE_NAME=2020-12-02-raspios-buster-armhf-lite.img
+export OS_IMG_FILE_NAME=2020-08-20-raspios-buster-armhf-lite.img
 
 export OS_IMG=/etc/raspberry-os/$OS_IMG_FILE_NAME
 
@@ -164,6 +164,7 @@ write "transfering setup script `cp -v hub_setup.sh $ROOT_MNT/home/`"
 write "copying docker file `cp -v docker-compose.yml $ROOT_MNT/home/`"
 write "copying shutdown handler `cp -v wait_for_shutdown_signal.sh $ROOT_MNT/home/`"
 write "copying shutdown handler server `cp -v shutdown_signal_eagledaddy.service $ROOT_MNT/home/`"
+write "copying eagledaddy config`cp -v config.yml $ROOT_MNT/home/`"
 
 # write "obtaining src code `get_eagledaddy_git`"
 # write "transfering src code `cp -v eagledaddy.tar.gz $ROOT_MNT/home/ && cp -v .env $ROOT_MNT/home/`"
